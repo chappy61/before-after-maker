@@ -11,6 +11,39 @@ const status = document.getElementById("status");
 
 let latestDataURL = null;
 
+async function shareOrOpenBlob(blob, filename="before-after.png"){
+  // 共有できるなら共有シートを出す（iOSだと「画像を保存」「ファイルに保存」等に繋がる）
+  try{
+    if(navigator.share){
+      const file = new File([blob], filename, { type: blob.type || "image/png" });
+      await navigator.share({ files: [file], title: "Before/After" });
+      return true;
+    }
+  }catch{
+    // shareキャンセル/失敗はここに来る（無視してフォールバック）
+  }
+
+  // フォールバック：新規タブで開いて、ユーザーが共有→保存
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  return false;
+}
+
+// 端末保存（実際は「共有で保存」を優先）
+saveBtn?.addEventListener("click", async (e)=>{
+  e.preventDefault();
+
+  // 生成直後（projectから生成）: dataURL → blob
+  if(latestDataURL){
+    const blob = dataURLToBlob(latestDataURL);
+    await shareOrOpenBlob(blob);
+    return;
+  }
+
+  // ギャラリー表示中: href(Blob URL) から取り出して共有…は取りにくいので
+  // showFromGallery 側で item.fullBlob を使って onclick を上書きする（下で入れる）
+});
+
 function getQueryId(){
   const sp = new URLSearchParams(location.search);
   return sp.get("id");
@@ -73,7 +106,12 @@ async function showFromGallery(id){
   latestDataURL = null; // gallery表示時はdataURLではない
 
   saveBtn.href = url;
-  saveBtn.style.display = "inline-flex";
+    // ギャラリー閲覧時も「共有で保存」を使う
+  saveBtn.onclick = async (e)=>{
+    e.preventDefault();
+    await shareOrOpenBlob(item.fullBlob);
+  };
+
 
   // ギャラリー閲覧のときは「アプリ内に保存」は不要
   if(saveInAppBtn) saveInAppBtn.style.display = "none";
@@ -117,6 +155,11 @@ async function boot(){
   }else{
     await showFromProject();
   }
+}
+
+const p = ensureProject();
+if(p.allowDeviceSave === false){
+  saveBtn.style.display = "none";
 }
 
 boot();
