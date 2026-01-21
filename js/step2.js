@@ -39,7 +39,7 @@ layoutGrid.addEventListener("click", (e)=>{
 });
 
 backBtn.addEventListener("click", ()=> {
-  window.location.href = "step1.html";
+  window.location.href = "index.html";
 });
 
 nextBtn.addEventListener("click", ()=> {

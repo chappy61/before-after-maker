@@ -19,13 +19,13 @@ function getQueryId(){
 backBtn.addEventListener("click", ()=>{
   // ギャラリーから開いてたらSTEP1、作成フローならSTEP4へ戻す
   const id = getQueryId();
-  window.location.href = id ? "step1.html" : "step4.html";
+  window.location.href = id ? "index.html" : "step4.html";
 });
 
 const toListBtn = document.getElementById("toListBtn");
 
 toListBtn?.addEventListener("click", ()=>{
-  window.location.href = "step1.html";
+  window.location.href = "index.html";
 });
 
 saveInAppBtn?.addEventListener("click", async ()=>{
