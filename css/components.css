@@ -1,0 +1,198 @@
+.grid {
+  display: grid;
+  gap: 10px;
+}
+
+.grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.cardbtn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12));
+  border-radius: 16px;
+  padding: 14px 10px;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 86px;
+  position: relative;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cardbtn:active {
+  transform: scale(0.98);
+}
+
+.cardbtn .num {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+}
+
+.cardbtn .label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cardbtn.selected {
+  border-color: rgba(125, 211, 252, 0.8);
+  background:
+    radial-gradient(380px 200px at 50% -40%, rgba(125, 211, 252, 0.22), transparent 55%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.12));
+}
+
+.small {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 10px;
+  text-align: center;
+  padding-bottom: 12px;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 13px;
+  transition:
+    opacity 0.2s ease,
+    transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: scale(0.99);
+}
+
+.btn.primary {
+  flex: 1;
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(125, 211, 252, 0.14);
+}
+
+.btn.ghost {
+  width: 110px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+/* ==== Gallery (grouped) ==== */
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0 14px;
+}
+
+/* 日付セクション */
+.gsection {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+}
+
+.gsummary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  padding: 12px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 900;
+  border-color: rgba(125, 211, 252, 0.8);
+}
+
+.gsummary::-webkit-details-marker {
+  display: none;
+}
+
+.gmeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gdate {
+  font-size: 13px;
+}
+
+.gcount {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.gchev {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* サムネ一覧 */
+.ggrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.gitem {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+.gitem img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  display: block;
+}
+
+/* 時刻バッジ（任意。あると便利） */
+.gtime {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #222;
+}

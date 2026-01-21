@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BeforeAfter Maker - STEP4</title>
+
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/step4.css" />
+
+    <script type="module" src="js/step4.js"></script>
+  </head>
+  <body>
+    <div class="app app-wide">
+      <div class="topbar">
+        <div class="title">Before/After Maker</div>
+        <div class="step">STEP 4 / 4</div>
+      </div>
+
+      <div class="wrap">
+        <!-- LEFT -->
+        <div class="left">
+          <div class="frame" id="frame">
+            <div class="photo-grid" id="photoGrid"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="right">
+          <div class="tools">
+            <div class="cardbox">
+              <div class="row">
+                <div>
+                  <div class="k">設定</div>
+                  <div class="v" id="summary"></div>
+                </div>
+                <div class="btns">
+                  <button class="btn" id="clearBtn" type="button">写真クリア</button>
+                  <button class="btn" id="recolorBtn" type="button">色を戻って変える</button>
+                </div>
+              </div>
+              <div class="note">※ iPhoneは枠タップ後に「写真を撮る」を選べます。</div>
+            </div>
+
+            <div class="cardbox">
+              <div class="row top">
+                <div class="grow">
+                  <div class="k">書き出し</div>
+
+                  <div class="field">
+                    <label class="k" for="titleInput">タイトル</label>
+                    <input id="titleInput" class="input" type="text" value="施術前後写真" />
+                  </div>
+
+                  <div class="field">
+                    <label class="k" for="ratioSelect">比率</label>
+                    <select id="ratioSelect" class="select">
+                      <option value="4:5" selected>4:5（おすすめ）</option>
+                      <option value="1:1">1:1</option>
+                    </select>
+                  </div>
+
+                  <div class="previewBox" id="previewBox" style="display: none">
+                    <img id="previewImg" alt="preview" />
+                  </div>
+                  <div class="note" id="previewNote">写真を全部入れたら「プレビュー生成」を押してください。</div>
+                </div>
+
+                <div class="btns rightcol">
+                  <button class="btn primary" id="makePreviewBtn" type="button" disabled>プレビューへ</button>
+
+                  <a
+                    class="btn"
+                    id="downloadBtn"
+                    download="before-after.png"
+                    style="display: none; text-decoration: none">
+                    PNG保存
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer footer-wide">
+        <button class="btn" id="backBtn" type="button">戻る</button>
+        <div class="note" style="margin: 0">空フレーム → 写真 → PNGまで完走するSTEP</div>
+      </div>
+    </div>
+
+    <input id="fileInput" type="file" accept="image/*" capture="environment" style="display: none" />
+  </body>
+</html>

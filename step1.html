@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BeforeAfter Maker - STEP1</title>
+
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+
+    <script type="module" src="js/step1.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <div class="topbar">
+        <div class="title">Before/After Maker</div>
+        <button class="btn ghost danger" id="clearGalleryBtn">🗑</button>
+        <div class="step">STEP 1 / 4</div>
+      </div>
+
+      <div class="content">
+        <div class="gallery" id="gallery"></div>
+
+        <div class="grid cols-3" id="countGrid">
+          <button class="cardbtn" data-count="2" type="button" aria-label="2枚">
+            <div class="num">2</div>
+          </button>
+          <button class="cardbtn" data-count="3" type="button" aria-label="3枚">
+            <div class="num">3</div>
+          </button>
+          <button class="cardbtn" data-count="4" type="button" aria-label="4枚">
+            <div class="num">4</div>
+          </button>
+        </div>
+
+        <div class="small" id="stateText">選択：未選択</div>
+      </div>
+
+      <div class="footer">
+        <button class="btn ghost" id="resetBtn" type="button">リセット</button>
+        <button class="btn primary" id="nextBtn" type="button" disabled>次へ</button>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,74 @@
+/* STEP2 only */
+.grid.cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.card {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12));
+  border-radius: 16px;
+  padding: 12px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.08s ease,
+    border-color 0.2s ease;
+  text-align: left;
+}
+
+.card:active {
+  transform: scale(0.99);
+}
+
+.card.selected {
+  border-color: rgba(125, 211, 252, 0.8);
+}
+
+.thumb {
+  height: 120px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.16);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb .line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.thumb.vertical .line {
+  width: 2px;
+  height: 100%;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.thumb.horizontal .line {
+  height: 2px;
+  width: 100%;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.lbl {
+  margin-top: 10px;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
