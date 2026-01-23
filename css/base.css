@@ -6,13 +6,24 @@
   /* 文字 */
   --text: #24301e;
   --muted: #8a8a8a;
+  --title: #f1ecd2; /* Belleロゴ由来カラー */
+
   /* 枠・影 */
   --border: rgba(0, 0, 0, 0.08);
   --radius: 18px;
+
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+
+  --font-ui:
+    system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+
+  --font-title: "Cormorant Garamond", serif;
 }
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -27,6 +38,7 @@ body {
     "Noto Sans JP",
     "Yu Gothic",
     sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background-color: var(--bg);
   min-height: 100svh;
@@ -35,8 +47,26 @@ body {
   justify-content: center;
   padding: 18px;
   margin: 0;
-  background: var(--bg, #8fae7b);
+  background: var(--bg);
   position: relative;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+.title {
+  font-family: var(--font-title);
+  color: var(--title);
+  letter-spacing: 0.08em;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.text {
+  color: var(--text);
+}
+
+.text-muted {
+  color: var(--muted);
 }
 
 .app {
@@ -84,6 +114,13 @@ p {
 html,
 body {
   height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+button,
+a,
+.home-item {
+  touch-action: manipulation;
 }
 
 /* 画面全体のビネット */
