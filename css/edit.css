@@ -39,8 +39,11 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 120%;
-  height: 120%;
+  width: auto;
+  height: auto;
+  min-width: 100%;
+  min-height: 100%;
+
   transform-origin: center;
   user-select: none;
   -webkit-user-drag: none;

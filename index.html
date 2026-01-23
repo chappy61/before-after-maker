@@ -19,13 +19,15 @@
 
       <div class="content">
         <div class="home-list">
-          <button class="home-item" id="newBtn">
+          <button class="home-item" id="newBtn" type="button">
             <span class="home-icon">📸</span>
             <span class="home-text">
               <span class="home-title">新規作成</span>
               <span class="home-desc">写真を選ぶ / 撮る</span>
             </span>
           </button>
+
+          <input id="pickPhotos" type="file" accept="image/*" multiple hidden />
 
           <div class="home-sep"></div>
 
@@ -38,7 +40,7 @@
           </a>
         </div>
 
-        <!-- 新規作成：写真 or カメラ -->
+        <!-- 新規作成：写真 or カメラ
         <dialog id="newDialog" class="home-dialog">
           <div class="home-dialog-title">新規作成</div>
 
@@ -55,7 +57,7 @@
           </div>
 
           <button class="btn ghost" id="closeDialog" type="button">閉じる</button>
-        </dialog>
+        </dialog> -->
       </div>
 
       <div class="footer"></div>

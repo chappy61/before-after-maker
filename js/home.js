@@ -8,7 +8,11 @@ const closeDialog = document.getElementById("closeDialog");
 const pickPhotos = document.getElementById("pickPhotos");
 const takePhoto  = document.getElementById("takePhoto");
 
-newBtn?.addEventListener("click", () => dlg?.showModal());
+newBtn?.addEventListener("click", () => {
+  if (pickPhotos) pickPhotos.value = "";
+  pickPhotos?.click();
+});
+
 closeDialog?.addEventListener("click", () => dlg?.close());
 
 // project初期化（新規作成）
@@ -57,5 +61,12 @@ async function ingestFiles(fileList){
   window.location.href = "edit.html";
 }
 
-pickPhotos?.addEventListener("change", (e)=> ingestFiles(e.target.files));
-takePhoto?.addEventListener("change",  (e)=> ingestFiles(e.target.files));
+pickPhotos?.addEventListener("change", (e) => {
+  const input = e.currentTarget; 
+  ingestFiles(input.files);
+});
+
+takePhoto?.addEventListener("change", (e) => {
+  const input = e.currentTarget; 
+  ingestFiles(input.files);
+});
