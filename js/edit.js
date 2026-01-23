@@ -206,6 +206,9 @@ scaleRange?.addEventListener("input", () => {
   const p = normalize();
   if (!p.edits[activeIndex]) return;
   p.edits[activeIndex].scale = Number(scaleRange.value);
+  const pane = split.querySelector(`.pane[data-index="${activeIndex}"]`);
+  if (pane) { p.edits[activeIndex].baseW = pane.clientWidth || 1; p.edits[activeIndex].baseH = pane.clientHeight || 1; }
+  stampBaseSize(p, activeIndex);
   saveProject(p);
   updateOne(activeIndex);
 });
@@ -214,6 +217,7 @@ rotateRange?.addEventListener("input", () => {
   const p = normalize();
   if (!p.edits[activeIndex]) return;
   p.edits[activeIndex].rotate = Number(rotateRange.value);
+  stampBaseSize(p, activeIndex);
   saveProject(p);
   updateOne(activeIndex);
 });
@@ -292,6 +296,16 @@ split.addEventListener("pointerdown", (e) => {
     };
   }
 });
+function stampBaseSize(p, i){
+  const pane = split.querySelector(`.pane[data-index="${i}"]`);
+  if(!pane) return;
+  const ed = p.edits?.[i];
+  if(!ed) return;
+
+  ed.baseW = pane.clientWidth || 1;
+  ed.baseH = pane.clientHeight || 1;
+}
+
 
 split.addEventListener("pointermove", (e) => {
   if (!pointers.has(e.pointerId)) return;
@@ -312,7 +326,7 @@ split.addEventListener("pointermove", (e) => {
 
     ed.x = Math.round(gesture.baseX + dx);
     ed.y = Math.round(gesture.baseY + dy);
-
+    stampBaseSize(p, activeIndex);
     saveProject(p);
     updateOne(activeIndex);
     return;
@@ -350,7 +364,7 @@ split.addEventListener("pointermove", (e) => {
     ed.rotate = Math.round(nextRotate * 10) / 10;
     ed.x = nextX;
     ed.y = nextY;
-
+    stampBaseSize(p, activeIndex);
     saveProject(p);
     updateOne(activeIndex);
     syncPanel(); // スライダーも追従させたいなら（重いなら外してOK）

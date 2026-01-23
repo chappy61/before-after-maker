@@ -2,7 +2,9 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>BeforeAfter Maker - Preview</title>
 
     <link rel="stylesheet" href="css/base.css" />
@@ -22,56 +24,10 @@
       <div class="content">
         <div class="previewBox" id="previewBox">
           <img id="previewImg" alt="preview" />
-        </div>
-
-        <div class="cardbox">
-          <div class="row">
-            <div class="grow">
-              <div class="k">ラベル</div>
-              <div class="small">位置と色をここで調整して保存します</div>
-            </div>
-
-            <label class="toggle">
-              <input id="labelOn" type="checkbox" checked />
-              <span>表示</span>
-            </label>
+          <div class="labelOverlay editable" id="labelOverlay" aria-hidden="true">
+            <div class="chip" data-kind="before">before</div>
+            <div class="chip" data-kind="after">after</div>
           </div>
-
-          <div class="row">
-            <div class="field grow">
-              <div class="k">色</div>
-              <div class="seg">
-                <button class="segbtn selected" data-color="white" type="button">白</button>
-                <button class="segbtn" data-color="black" type="button">黒</button>
-              </div>
-            </div>
-
-            <div class="field">
-              <div class="k">比率</div>
-              <select id="ratioSelect" class="select">
-                <option value="4:5" selected>4:5</option>
-                <option value="1:1">1:1</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="field grow">
-              <div class="k">横位置</div>
-              <input id="xRange" type="range" min="-120" max="120" step="1" value="0" />
-            </div>
-            <button class="btn ghost" id="xReset" type="button">0</button>
-          </div>
-
-          <div class="row">
-            <div class="field grow">
-              <div class="k">縦位置</div>
-              <input id="yRange" type="range" min="-120" max="120" step="1" value="0" />
-            </div>
-            <button class="btn ghost" id="yReset" type="button">0</button>
-          </div>
-
-          <div class="small note" id="statusText">プレビュー生成中…</div>
         </div>
 
         <div class="cardbox">
@@ -84,10 +40,10 @@
           </div>
 
           <div class="row">
-            <a class="btn" id="downloadBtn" download="before-after.png" style="text-decoration: none; display: none">
-              端末に保存（PNG）
-            </a>
+            <a class="btn download hidden" id="downloadBtn" download="before-after.png">端末に保存（PNG）</a>
           </div>
+
+          <div class="small note" id="statusText">プレビュー生成中…</div>
         </div>
       </div>
 

@@ -83,19 +83,12 @@ export async function composePNG(p, options){
   canvas.height = H;
   const ctx = canvas.getContext("2d");
 
-  // 背景
-  ctx.fillStyle = themeToColor(p.theme || "green");
-  ctx.fillRect(0, 0, W, H);
-
   // レイアウト固定値
   const PAD = 40;
   const HEADER_H = 96;
   const GAP = 14;
   const GRID_TOP = PAD + HEADER_H;
   const GRID_BOTTOM = H - PAD;
-
-  drawTitle(ctx, title, W, PAD + HEADER_H/2);
-
   const gridX = PAD;
   const gridY = GRID_TOP;
   const gridW = Math.max(1, W - PAD*2);
@@ -143,7 +136,22 @@ export async function composePNG(p, options){
       roundedRectPath(ctx, x, y, cellW, cellH, rad);
       ctx.clip();
 
-      const edit = p.edits?.[idx] || { x:0, y:0, scale:1, rotate:0 };
+      const raw = p.edits?.[idx] || { x:0, y:0, scale:1, rotate:0 };
+
+      // ✅ Edit画面の基準サイズ（保存されてなければ「変換なし」になる）
+      const bw = raw.baseW || cellW;
+      const bh = raw.baseH || cellH;
+
+      // ✅ 出力セルサイズへの倍率
+      const fx = cellW / bw;
+      const fy = cellH / bh;
+
+      // ✅ 出力用 edit（x/y をスケール変換）
+      const edit = {
+        ...raw,
+        x: (raw.x || 0) * fx,
+        y: (raw.y || 0) * fy,
+      };
 
       // 回転/拡大/位置があるなら transformed、なければ従来 coverDraw
       if(edit && (edit.x||edit.y||edit.rotate||edit.scale !== 1)){
@@ -152,15 +160,9 @@ export async function composePNG(p, options){
         coverDraw(ctx, imgs[idx], x, y, cellW, cellH);
       }
 
+
       ctx.restore();
 
-      // うっすら枠
-      ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,.22)";
-      ctx.lineWidth = 2;
-      roundedRectPath(ctx, x, y, cellW, cellH, rad);
-      ctx.stroke();
-      ctx.restore();
 
       idx++;
       if(idx >= need) break;
