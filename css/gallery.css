@@ -22,7 +22,6 @@
   display: block;
 }
 
-/* STEP5 footer: きれいに整列 */
 .footer-wide {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

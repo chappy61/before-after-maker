@@ -1,59 +1,7 @@
-import { ensureProject, saveProject } from "./storage.js";
-import { listGallery } from "./db.js";
+import { listGallery, clearGallery, deleteGalleryItem } from "./db.js";
 
-const countGrid = document.getElementById("countGrid");
-const nextBtn = document.getElementById("nextBtn");
-const resetBtn = document.getElementById("resetBtn");
-const stateText = document.getElementById("stateText");
 const galleryEl = document.getElementById("gallery");
-
-// ---------------------
-// STEP1: 枚数選択
-// ---------------------
-function render(project){
-  [...countGrid.querySelectorAll(".cardbtn")].forEach(btn=>{
-    const c = Number(btn.dataset.count);
-    btn.classList.toggle("selected", project.count === c);
-  });
-
-  if(project.count){
-    stateText.textContent = `選択：${project.count}枚`;
-    nextBtn.disabled = false;
-  }else{
-    stateText.textContent = "選択：未選択";
-    nextBtn.disabled = true;
-  }
-}
-
-function setSelectedCount(count){
-  const project = ensureProject();
-  project.count = count;
-
-  // downstream reset（安全側）
-  project.layout = null;
-  project.theme = null;
-  project.images = [];
-
-  saveProject(project);
-  render(project);
-}
-
-// events
-countGrid.addEventListener("click", (e)=>{
-  const btn = e.target.closest(".cardbtn");
-  if(!btn) return;
-  const count = Number(btn.dataset.count);
-  setSelectedCount(count);
-});
-
-nextBtn.addEventListener("click", ()=>{
-  window.location.href = "step2.html";
-});
-
-resetBtn.addEventListener("click", ()=>{
-  localStorage.removeItem("ba_project_v1");
-  render(ensureProject());
-});
+const clearBtn = document.getElementById("clearGalleryBtn");
 
 // ---------------------
 // Gallery: 日付でまとめて表示（折りたたみ）
@@ -79,14 +27,14 @@ function timeLabel(ts){
 async function renderGallery(){
   if(!galleryEl) return;
 
-  const items = await listGallery(60); // 表示件数はお好みで
+  const items = await listGallery(60);
   if(items.length === 0){
     galleryEl.innerHTML = `<div class="gallery-empty">保存した画像がここに表示されます</div>`;
     return;
   }
 
   // 日付でグルーピング
-  const groups = new Map(); // key -> items[]
+  const groups = new Map();
   for(const it of items){
     const k = dateKey(it.createdAt);
     if(!groups.has(k)) groups.set(k, []);
@@ -105,7 +53,6 @@ async function renderGallery(){
     const thumbs = arr.map(it=>{
       const url = URL.createObjectURL(it.thumbBlob);
       const t = timeLabel(it.createdAt);
-
       return `
         <div class="gitem" data-id="${it.id}" title="${k} ${t}">
           <img src="${url}" alt="thumb" />
@@ -114,8 +61,6 @@ async function renderGallery(){
       `;
     }).join("");
 
-    const todayKey = dateKey(Date.now());
-    
     sections.push(`
       <details class="gsection">
         <summary class="gsummary">
@@ -140,10 +85,9 @@ async function renderGallery(){
 
     const id = item.dataset.id;
 
-    // 長押し or 右クリック想定（PC/iPad）
+    // Ctrl/⌘/Shift で削除（PC/iPadキーボード想定）
     if(e.ctrlKey || e.metaKey || e.shiftKey){
       if(confirm("この画像を削除しますか？")){
-        const { deleteGalleryItem } = await import("./db.js");
         await deleteGalleryItem(id);
         renderGallery();
       }
@@ -151,14 +95,11 @@ async function renderGallery(){
     }
 
     // 通常タップ → 表示
-    window.location.href = `step5.html?id=${encodeURIComponent(id)}`;
+    window.location.href = `gallery.html?id=${encodeURIComponent(id)}`;
   };
-
 }
-import { clearGallery } from "./db.js";
 
-const clearBtn = document.getElementById("clearGalleryBtn");
-
+// 一括削除
 clearBtn?.addEventListener("click", async ()=>{
   if(!confirm("保存した画像をすべて削除しますか？\nこの操作は元に戻せません。")){
     return;
@@ -167,8 +108,5 @@ clearBtn?.addEventListener("click", async ()=>{
   renderGallery();
 });
 
-// ---------------------
 // init
-// ---------------------
-render(ensureProject());
 renderGallery();

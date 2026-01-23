@@ -196,3 +196,79 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
   color: #222;
 }
+.home-list {
+  max-width: 520px; /* iPadで広がりすぎない */
+  margin: 0 auto;
+  padding: 24px 16px;
+  padding-top: min(20vh, 120px);
+  min-height: 60vh;
+}
+
+.home-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  width: 100%;
+  padding: 14px 4px; /* ← 高さの正体 */
+  background: transparent;
+  border: none;
+
+  color: #24301e;
+  text-align: left;
+}
+
+.home-item:active {
+  background: rgba(0, 0, 0, 0.04); /* 押した感だけ */
+}
+
+.home-icon {
+  font-size: 26px;
+  width: 32px;
+  text-align: center;
+}
+
+.home-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.home-desc {
+  font-size: 13px;
+  color: #4f5f46;
+}
+
+.home-sep {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 10px 0;
+}
+.home-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.home-dialog {
+  border: none;
+  border-radius: 16px;
+  padding: 16px;
+}
+.home-dialog-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.home-dialog-btn {
+  display: block;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  color: #111;
+  text-align: center;
+}

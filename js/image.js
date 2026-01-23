@@ -33,3 +33,29 @@ export function coverDraw(ctx, img, x, y, w, h){
   const ny = y + (h - nh)/2;
   ctx.drawImage(img, nx, ny, nw, nh);
 }
+// image.js に追加
+export function coverDrawTransformed(ctx, img, x, y, w, h, edit){
+  const e = edit || { x:0, y:0, scale:1, rotate:0 };
+
+  // cover fit の基礎スケール
+  const sCover = Math.max(w / img.width, h / img.height);
+
+  // 追加の拡大
+  const s = sCover * (e.scale ?? 1);
+
+  // セル中心
+  const cx = x + w/2;
+  const cy = y + h/2;
+
+  ctx.save();
+  // セルでclipしてる前提でもOK。ここ単体で使うならclipは外側で。
+  ctx.translate(cx, cy);
+  ctx.rotate(((e.rotate ?? 0) * Math.PI) / 180);
+  ctx.translate((e.x ?? 0), (e.y ?? 0)); // ← “ズレ補正”の値
+  ctx.scale(s, s);
+
+  // 画像中心を原点に合わせて描く
+  ctx.drawImage(img, -img.width/2, -img.height/2);
+
+  ctx.restore();
+}

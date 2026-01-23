@@ -3,43 +3,62 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BeforeAfter Maker - STEP1</title>
+    <title>BeforeAfter Maker</title>
 
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/components.css" />
 
-    <script type="module" src="js/step1.js"></script>
+    <script type="module" src="js/home.js"></script>
   </head>
+
   <body>
     <div class="app">
       <div class="topbar">
         <div class="title">Before/After Maker</div>
-        <button class="btn ghost danger" id="clearGalleryBtn">🗑</button>
-        <div class="step">STEP 1 / 4</div>
       </div>
 
       <div class="content">
-        <div class="gallery" id="gallery"></div>
+        <div class="home-list">
+          <button class="home-item" id="newBtn">
+            <span class="home-icon">📸</span>
+            <span class="home-text">
+              <span class="home-title">新規作成</span>
+              <span class="home-desc">写真を選ぶ / 撮る</span>
+            </span>
+          </button>
 
-        <div class="grid cols-3" id="countGrid">
-          <button class="cardbtn" data-count="2" type="button" aria-label="2枚">
-            <div class="num">2</div>
-          </button>
-          <button class="cardbtn" data-count="3" type="button" aria-label="3枚">
-            <div class="num">3</div>
-          </button>
-          <button class="cardbtn" data-count="4" type="button" aria-label="4枚">
-            <div class="num">4</div>
-          </button>
+          <div class="home-sep"></div>
+
+          <a class="home-item" href="gallery.html">
+            <span class="home-icon">🖼</span>
+            <span class="home-text">
+              <span class="home-title">ギャラリー</span>
+              <span class="home-desc">保存した画像を見る</span>
+            </span>
+          </a>
         </div>
 
-        <div class="small" id="stateText">選択：未選択</div>
+        <!-- 新規作成：写真 or カメラ -->
+        <dialog id="newDialog" class="home-dialog">
+          <div class="home-dialog-title">新規作成</div>
+
+          <div class="home-dialog-actions">
+            <label class="home-dialog-btn">
+              📁 写真を選ぶ
+              <input id="pickPhotos" type="file" accept="image/*" multiple hidden />
+            </label>
+
+            <label class="home-dialog-btn">
+              📷 写真を撮る
+              <input id="takePhoto" type="file" accept="image/*" capture="environment" hidden />
+            </label>
+          </div>
+
+          <button class="btn ghost" id="closeDialog" type="button">閉じる</button>
+        </dialog>
       </div>
 
-      <div class="footer">
-        <button class="btn ghost" id="resetBtn" type="button">リセット</button>
-        <button class="btn primary" id="nextBtn" type="button" disabled>次へ</button>
-      </div>
+      <div class="footer"></div>
     </div>
   </body>
 </html>

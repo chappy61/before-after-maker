@@ -1,6 +1,7 @@
 import { themeToColor } from "./theme.js";
+import { coverDraw, coverDrawTransformed } from "./image.js";
+// makeGridTemplate は “旧レイアウト互換” のために残してもOK
 import { makeGridTemplate } from "./layout.js";
-import { coverDraw } from "./image.js";
 
 function roundedRectPath(ctx, x, y, w, h, r){
   const rr = Math.max(0, Math.min(r, w/2, h/2));
@@ -23,10 +24,13 @@ function drawTitle(ctx, text, W, y){
   ctx.restore();
 }
 
-function drawChip(ctx, text, x, y){
+function drawChip(ctx, text, x, y, opt={}){
+  const color = opt.color || "white"; // white/black
+  const alpha = opt.alpha ?? 0.70;    // 半透明感
   ctx.save();
   ctx.font = "900 38px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   ctx.textBaseline = "alphabetic";
+
   const padX = 22, padY = 14;
   const tw = ctx.measureText(text).width;
   const th = 44;
@@ -35,21 +39,41 @@ function drawChip(ctx, text, x, y){
   const bh = th + padY*2;
 
   roundedRectPath(ctx, x, y - bh, bw, bh, 999);
-  ctx.fillStyle = "rgba(255,255,255,.92)";
-  ctx.fill();
 
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillText(text, x + padX, y - padY - 8);
+  if(color === "black"){
+    ctx.fillStyle = `rgba(0,0,0,${0.55*alpha})`;
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${0.92})`;
+    ctx.fillText(text, x + padX, y - padY - 8);
+  }else{
+    ctx.fillStyle = `rgba(255,255,255,${0.85*alpha})`;
+    ctx.fill();
+    ctx.fillStyle = `rgba(26,26,26,${0.95})`;
+    ctx.fillText(text, x + padX, y - padY - 8);
+  }
   ctx.restore();
 }
 
 /**
- * p = {count, layout, theme, images[]}
- * options = { title: string, ratio: "4:5"|"1:1" }
+ * p = { layout, theme, images[], edits[], labels? }
+ * options = { title, ratio, labels? }
+ *
+ * layout:
+ *  - 新: "split_lr" (左右) / "split_tb" (上下)
+ *  - 旧: "vertical"/"horizontal" も互換で残す
  */
 export async function composePNG(p, options){
   const ratio = options?.ratio || "4:5";
   const title = options?.title || "施術前後写真";
+
+
+  const labels = {
+    enabled: options?.labels?.enabled ?? p.labels?.enabled ?? true,
+    color: options?.labels?.color ?? p.labels?.color ?? "white",
+    offsetX: options?.labels?.offsetX ?? p.labels?.offsetX ?? 0,
+    offsetY: options?.labels?.offsetY ?? p.labels?.offsetY ?? 0,
+    alpha: options?.labels?.alpha ?? 0.70,
+  };
 
   const W = 1080;
   const H = (ratio === "1:1") ? 1080 : 1350;
@@ -63,42 +87,49 @@ export async function composePNG(p, options){
   ctx.fillStyle = themeToColor(p.theme || "green");
   ctx.fillRect(0, 0, W, H);
 
-  // レイアウト（安全な固定値）
-  const PAD = 40;              // 外枠余白
-  const HEADER_H = 96;         // タイトル領域
-  const GAP = 14;              // 画像間
+  // レイアウト固定値
+  const PAD = 40;
+  const HEADER_H = 96;
+  const GAP = 14;
   const GRID_TOP = PAD + HEADER_H;
   const GRID_BOTTOM = H - PAD;
 
-  // タイトル
   drawTitle(ctx, title, W, PAD + HEADER_H/2);
 
-  // グリッド領域（必ず正にする）
   const gridX = PAD;
   const gridY = GRID_TOP;
   const gridW = Math.max(1, W - PAD*2);
   const gridH = Math.max(1, GRID_BOTTOM - GRID_TOP);
 
-  // cols/rows
-  const count = Number(p.count || 2);
-  const layout = p.layout || "vertical";
-  const { cols, rows } = makeGridTemplate(count, layout);
-  const total = cols * rows;
+  // 画像読み込み（今は2枚前提で最短）
+  const need = 2;
+  if((p.images?.length || 0) < need) throw new Error("画像が不足しています（2枚必要）");
 
-  // セルサイズ（必ず正にする）
-  const cellW = Math.max(1, (gridW - GAP*(cols-1)) / cols);
-  const cellH = Math.max(1, (gridH - GAP*(rows-1)) / rows);
-
-  // 画像読み込み
   const imgs = [];
-  for(let i=0;i<total;i++){
-    const src = p.images?.[i];
-    if(!src) throw new Error("画像が不足しています");
+  for(let i=0;i<need;i++){
     const im = new Image();
-    im.src = src;
+    im.src = p.images[i];
     await im.decode();
     imgs.push(im);
   }
+
+  // セルの計算（split_lr / split_tb を優先）
+  const layout = p.layout || "split_lr";
+
+  let cols = 2, rows = 1; // デフォ左右
+  if(layout === "split_tb"){
+    cols = 1; rows = 2;
+  }else if(layout === "split_lr"){
+    cols = 2; rows = 1;
+  }else{
+    // 旧互換：makeGridTemplate
+    const legacy = makeGridTemplate(Number(p.count || 2), layout);
+    cols = legacy.cols; rows = legacy.rows;
+  }
+
+  const total = cols * rows;
+  const cellW = Math.max(1, (gridW - GAP*(cols-1)) / cols);
+  const cellH = Math.max(1, (gridH - GAP*(rows-1)) / rows);
 
   // セル描画
   let idx = 0;
@@ -108,39 +139,53 @@ export async function composePNG(p, options){
       const y = gridY + r*(cellH + GAP);
       const rad = Math.min(26, cellW/6, cellH/6);
 
-      // clip
       ctx.save();
       roundedRectPath(ctx, x, y, cellW, cellH, rad);
       ctx.clip();
-      coverDraw(ctx, imgs[idx], x, y, cellW, cellH);
+
+      const edit = p.edits?.[idx] || { x:0, y:0, scale:1, rotate:0 };
+
+      // 回転/拡大/位置があるなら transformed、なければ従来 coverDraw
+      if(edit && (edit.x||edit.y||edit.rotate||edit.scale !== 1)){
+        coverDrawTransformed(ctx, imgs[idx], x, y, cellW, cellH, edit);
+      }else{
+        coverDraw(ctx, imgs[idx], x, y, cellW, cellH);
+      }
+
       ctx.restore();
 
       // うっすら枠
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,.28)";
+      ctx.strokeStyle = "rgba(255,255,255,.22)";
       ctx.lineWidth = 2;
       roundedRectPath(ctx, x, y, cellW, cellH, rad);
       ctx.stroke();
       ctx.restore();
 
       idx++;
+      if(idx >= need) break;
     }
+    if(idx >= need) break;
   }
 
-  // before/after（2枚のときだけ）
-  if(total === 2){
-    if(layout === "vertical"){
-      drawChip(ctx, "before", gridX + 18, gridY + cellH - 18);
-      // after は右下
-      ctx.save();
-      // 右側セルの右端から逆算して置く
-      const afterX = gridX + (cellW + GAP) + 18;
-      // 右に寄せたいなら文字幅計測で逆算もできるけど、まずはこれでOK
-      drawChip(ctx, "after", afterX, gridY + cellH - 18);
-      ctx.restore();
+  // ラベル（2枚のとき）
+  if(labels.enabled && total === 2){
+    const offX = labels.offsetX;
+    const offY = labels.offsetY;
+
+    // 置き場所：左上固定（理想画像に合わせる）
+    // チップ関数が“yは下端”なので、上に置くため y計算を変える
+    // ここでは chipを「上に出す」ために y = gridY + 80 くらいにする
+    const chipYTop = gridY + 80 + offY;
+
+    if(cols === 2){
+      // 左右
+      drawChip(ctx, "before", gridX + 18 + offX, chipYTop, labels);
+      drawChip(ctx, "after",  gridX + (cellW + GAP) + 18 + offX, chipYTop, labels);
     }else{
-      drawChip(ctx, "before", gridX + 18, gridY + cellH - 18);
-      drawChip(ctx, "after", gridX + 18, gridY + (cellH + GAP) + cellH - 18);
+      // 上下
+      drawChip(ctx, "before", gridX + 18 + offX, gridY + 80 + offY, labels);
+      drawChip(ctx, "after",  gridX + 18 + offX, gridY + (cellH + GAP) + 80 + offY, labels);
     }
   }
 

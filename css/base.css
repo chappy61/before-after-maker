@@ -1,19 +1,13 @@
 :root {
-  /* 背景・パネル */
-  --bg: #f6f7f8;
-  --panel: #ffffff;
+  --bg: #8fae7b; /* お店カラー */
+  --card: #e6ede2; /* bgを薄く・彩度を落とした色 */
+  --card-border: #d2dccb; /* さらに薄く */
 
   /* 文字 */
-  --text: #1a1a1a;
+  --text: #24301e;
   --muted: #8a8a8a;
-
-  /* アクセント（美容系くすみ） */
-  --accent: #c8b7a6; /* くすみベージュ */
-
   /* 枠・影 */
   --border: rgba(0, 0, 0, 0.08);
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-
   --radius: 18px;
 }
 
@@ -34,19 +28,20 @@ body {
     "Yu Gothic",
     sans-serif;
   color: var(--text);
+  background-color: var(--bg);
   min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 18px;
+  margin: 0;
+  background: var(--bg, #8fae7b);
+  position: relative;
 }
 
 .app {
   width: min(520px, 100%);
-
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
   overflow: hidden;
   backdrop-filter: blur(10px);
 }
@@ -56,19 +51,12 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.22), transparent);
-  border-bottom: 1px solid var(--border);
 }
 
 .topbar .title {
   font-weight: 800;
   letter-spacing: 0.2px;
   font-size: 15px;
-}
-
-.topbar .step {
-  font-size: 12px;
-  color: var(--muted);
 }
 
 .content {
@@ -92,6 +80,31 @@ p {
   display: flex;
   gap: 10px;
   padding: 14px 16px 16px;
-  border-top: 1px solid var(--border);
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.18), transparent);
+}
+html,
+body {
+  height: 100%;
+}
+
+/* 画面全体のビネット */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.22) 100%);
+}
+
+/* アプリ本体はビネットより前 */
+.app,
+.app-bg,
+main {
+  position: relative;
+  z-index: 1;
+}
+a {
+  text-decoration: none;
+  color: inherit;
 }
