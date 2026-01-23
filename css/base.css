@@ -1,74 +1,126 @@
+/* ---------------------------------------------------------
+   1) Design Tokens（色・角丸・フォント・Safe Area）
+   --------------------------------------------------------- */
 :root {
-  --bg: #8fae7b; /* お店カラー */
+  /* Brand / UI colors */
+  --bg: #8fae7b; /* お店カラー（背景） */
   --card: #e6ede2; /* bgを薄く・彩度を落とした色 */
   --card-border: #d2dccb; /* さらに薄く */
 
-  /* 文字 */
-  --text: #24301e;
-  --muted: #8a8a8a;
-  --title: #f1ecd2; /* Belleロゴ由来カラー */
+  /* Text colors */
+  --text: #24301e; /* 通常テキスト（深緑寄り黒） */
+  --muted: #8a8a8a; /* 補助テキスト */
+  --title: #f1ecd2; /* Belleロゴ由来カラー（タイトル用） */
 
-  /* 枠・影 */
+  /* Shape / shadow */
   --border: rgba(0, 0, 0, 0.08);
   --radius: 18px;
 
+  /* iOS safe-area */
   --safe-top: env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
 
+  /* Fonts */
   --font-ui:
     system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
-
   --font-title: "Cormorant Garamond", serif;
 }
 
+/* ---------------------------------------------------------
+   2) Resets / Interaction（全体の基礎・誤タップ対策）
+   --------------------------------------------------------- */
 * {
   box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: transparent; /* iOSの青ハイライト消す */
 }
 
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden; /* トップ画面はスクロールさせない方針 */
+}
+
+/* ギャラリー/詳細だけはスクロール許可 */
+body.page-gallery {
+  overflow: auto;
+}
+
+/* ダブルタップズーム等の誤挙動を減らす */
+button,
+a,
+.home-item {
+  touch-action: manipulation;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------
+   3) Page Layout（画面全体）
+   - bodyは「背景」「中央寄せ」「safe-area吸収」担当
+   --------------------------------------------------------- */
 body {
   margin: 0;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Hiragino Sans",
-    "Noto Sans JP",
-    "Yu Gothic",
-    sans-serif;
   font-family: var(--font-ui);
   color: var(--text);
-  background-color: var(--bg);
+
+  /* 画面全体のベース */
   min-height: 100svh;
+  background: var(--bg);
+  position: relative;
+
+  /* 中央寄せ（PC/タブで綺麗に見せる） */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px;
-  margin: 0;
+
+  /* 端末の安全領域 + 少し余白 */
+  padding: calc(var(--safe-top) + 18px) 18px calc(var(--safe-bottom) + 18px);
+}
+
+/* iOSで「下だけ色が違う」帯を確実に背景色で埋める（保険） */
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--safe-bottom);
   background: var(--bg);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------
+   4) Background Effects（ビネットなど装飾レイヤー）
+   --------------------------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  /* 画面全体のビネット（空白が「間」になる） */
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.22) 100%);
+}
+
+/* ---------------------------------------------------------
+   5) App Shell（アプリ本体の器）
+   - ビネットより前に出す
+   --------------------------------------------------------- */
+#app,
+.app,
+main,
+.container,
+.home {
   position: relative;
-  padding-top: var(--safe-top);
-  padding-bottom: var(--safe-bottom);
-}
-.title {
-  font-family: var(--font-title);
-  color: var(--title);
-  letter-spacing: 0.08em;
-  letter-spacing: 0.08em;
-  font-weight: 500;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  z-index: 1;
 }
 
-.text {
-  color: var(--text);
-}
-
-.text-muted {
-  color: var(--muted);
-}
-
+/* アプリの枠（スマホは全幅、PCは最大幅） */
 .app {
   width: min(520px, 100%);
   border-radius: var(--radius);
@@ -76,23 +128,26 @@ body {
   backdrop-filter: blur(10px);
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
+/* ---------------------------------------------------------
+   6) Typography（タイポグラフィ）
+   --------------------------------------------------------- */
+.title {
+  font-family: var(--font-title);
+  color: var(--title);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
-.topbar .title {
-  font-weight: 800;
-  letter-spacing: 0.2px;
-  font-size: 15px;
+/* UIの本文用ユーティリティ */
+.text {
+  color: var(--text);
+}
+.text-muted {
+  color: var(--muted);
 }
 
-.content {
-  padding: 18px 16px 16px;
-}
-
+/* ページ内の見出し・説明 */
 h1 {
   margin: 0 0 8px;
   font-size: 20px;
@@ -106,42 +161,29 @@ p {
   line-height: 1.6;
 }
 
+/* ---------------------------------------------------------
+   7) Components（パーツ）
+   --------------------------------------------------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+/* topbar内のタイトルは少し詰めてOK（ただし重複しないようここで上書き） */
+.topbar .title {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  font-size: 15px;
+}
+
+.content {
+  padding: 18px 16px 16px;
+}
+
 .footer {
   display: flex;
   gap: 10px;
   padding: 14px 16px 16px;
-}
-html,
-body {
-  height: 100%;
-  background: var(--bg);
-  overflow: hidden;
-}
-button,
-a,
-.home-item {
-  touch-action: manipulation;
-}
-
-/* 画面全体のビネット */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.22) 100%);
-}
-
-/* アプリ本体はビネットより前 */
-.app,
-.app-bg,
-main {
-  position: relative;
-  z-index: 1;
-}
-a {
-  text-decoration: none;
-  color: inherit;
 }

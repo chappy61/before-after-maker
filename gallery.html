@@ -2,26 +2,35 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Gallery - BeforeAfter Maker</title>
 
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/gallery.css" />
 
     <script type="module" src="js/gallery.js"></script>
   </head>
 
-  <body>
+  <body class="page-gallery">
     <div class="app">
       <div class="topbar">
-        <a class="btn ghost" href="index.html">←</a>
+        <a class="btn ghost back" href="index.html" aria-label="戻る">←</a>
         <div class="title">ギャラリー</div>
-        <button class="btn ghost danger" id="clearGalleryBtn">🗑</button>
+
+        <div class="topbar-actions">
+          <button class="btn ghost" id="selectModeBtn">選択</button>
+          <button class="btn ghost danger" id="deleteSelectedBtn" disabled>削除</button>
+        </div>
       </div>
 
       <div class="content">
         <div class="gallery" id="gallery"></div>
       </div>
+
+      <div class="yearbar" id="yearbar"></div>
     </div>
   </body>
 </html>

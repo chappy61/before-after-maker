@@ -1,12 +1,20 @@
+/* =========================================================
+   components.css - shared UI components
+   ========================================================= */
+
+/* ---- Grid ---- */
 .grid {
   display: grid;
   gap: 10px;
 }
-
+.grid.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
 .grid.cols-3 {
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* ---- Card Button (selection tiles etc.) ---- */
 .cardbtn {
   appearance: none;
   border: 1px solid var(--border);
@@ -29,22 +37,18 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-
 .cardbtn:active {
   transform: scale(0.98);
 }
-
 .cardbtn .num {
   font-size: 22px;
   font-weight: 900;
   letter-spacing: 0.4px;
 }
-
 .cardbtn .label {
   font-size: 12px;
   color: var(--muted);
 }
-
 .cardbtn.selected {
   border-color: rgba(125, 211, 252, 0.8);
   background:
@@ -52,6 +56,7 @@
     linear-gradient(to bottom, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.12));
 }
 
+/* ---- Small helper text ---- */
 .small {
   font-size: 11px;
   color: var(--muted);
@@ -60,6 +65,7 @@
   padding-bottom: 12px;
 }
 
+/* ---- Buttons ---- */
 .btn {
   appearance: none;
   border: 1px solid var(--border);
@@ -75,184 +81,75 @@
     transform 0.08s ease;
   -webkit-tap-highlight-color: transparent;
 }
-
 .btn:active {
   transform: scale(0.99);
 }
-
 .btn.primary {
   flex: 1;
   border-color: rgba(125, 211, 252, 0.55);
   background: rgba(125, 211, 252, 0.14);
 }
 
+/* ghost は基本は“ただの軽いボタン”にしておく（ページ側で味付け） */
 .btn.ghost {
-  width: 110px;
+  background: rgba(0, 0, 0, 0.12);
 }
-
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.grid.cols-2 {
-  grid-template-columns: repeat(2, 1fr);
-}
-/* ==== Gallery (grouped) ==== */
-.gallery {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 2px 0 14px;
-}
 
-/* 日付セクション */
-.gsection {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: rgba(0, 0, 0, 0.03);
-  overflow: hidden;
-}
-
-.gsummary {
-  list-style: none;
-  cursor: pointer;
-  user-select: none;
-  padding: 12px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-weight: 900;
-  border-color: rgba(125, 211, 252, 0.8);
-}
-
-.gsummary::-webkit-details-marker {
-  display: none;
-}
-
-.gmeta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.gdate {
-  font-size: 13px;
-}
-
-.gcount {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 800;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.gchev {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-/* サムネ一覧 */
-.ggrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-  gap: 10px;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.65);
-}
-
-.gitem {
-  position: relative;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-  cursor: pointer;
-  background: #fff;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
-}
-
-.gitem img {
-  width: 100%;
-  aspect-ratio: 4 / 5;
-  object-fit: cover;
-  display: block;
-}
-
-/* 時刻バッジ（任意。あると便利） */
-.gtime {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  font-size: 10px;
-  font-weight: 900;
-  padding: 5px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #222;
-}
+/* ---- Home (index) ---- */
 .home-list {
-  max-width: 520px; /* iPadで広がりすぎない */
+  max-width: 520px;
   margin: 0 auto;
   padding: 24px 16px;
   padding-top: min(20vh, 120px);
   min-height: 60vh;
-}
-
-.home-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-
-  width: 100%;
-  padding: 14px 4px; /* ← 高さの正体 */
-  background: transparent;
-  border: none;
-
-  color: #24301e;
-  text-align: left;
-}
-
-.home-item:active {
-  background: rgba(0, 0, 0, 0.04); /* 押した感だけ */
-}
-
-.home-icon {
-  font-size: 26px;
-  width: 32px;
-  text-align: center;
-}
-
-.home-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.home-title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.home-desc {
-  font-size: 13px;
-  color: #4f5f46;
-}
-
-.home-sep {
-  height: 1px;
-  background: rgba(0, 0, 0, 0.15);
-  margin: 10px 0;
 }
 .home-wrapper {
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
+.home-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 4px;
+  background: transparent;
+  border: none;
+  color: #24301e;
+  text-align: left;
+}
+.home-item:active {
+  background: rgba(0, 0, 0, 0.04);
+}
+.home-icon {
+  font-size: 26px;
+  width: 32px;
+  text-align: center;
+}
+.home-text {
+  display: flex;
+  flex-direction: column;
+}
+.home-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.home-desc {
+  font-size: 13px;
+  color: #4f5f46;
+}
+.home-sep {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 10px 0;
+}
+
+/* ---- Home dialog ---- */
 .home-dialog {
   border: none;
   border-radius: 16px;
@@ -262,7 +159,6 @@
   display: grid;
   gap: 10px;
 }
-
 .home-dialog-btn {
   display: block;
   padding: 12px;
