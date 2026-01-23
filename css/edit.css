@@ -1,64 +1,106 @@
+/* =========================================================
+   比較フレーム（4:5固定） + splitレイアウト
+   ========================================================= */
+
+/* 外枠（画像比較の表示領域）
+   - aspect-ratio 4/5 を絶対守る（ここが崩れると全部崩れる）
+   - 角丸 + はみ出し隠し */
 .frame {
+  width: 100%;
+  aspect-ratio: 4 / 5; /* 最重要 */
+  position: relative;
   border-radius: 16px;
   overflow: hidden;
-  aspect-ratio: 4/5;
 }
 
+/* splitコンテナ（2分割表示のベース）
+   - gridで左右/上下を切り替える
+   - gap=1pxで仕切り線を作る（背景色が線になる） */
 .split {
-  display: grid;
-  gap: 1px; /* 仕切り線細く */
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 16px;
-  overflow: hidden;
   width: 100%;
   height: 100%;
+  display: grid;
+
+  gap: 1px; /* 仕切り線の太さ */
+  background: rgba(0, 0, 0, 0.18); /* 仕切り線の色として見える */
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-/* 左右 split_lr */
+/* 左右分割（left-right） */
 .split.split_lr {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr;
 }
 
-/* 上下 split_tb */
+/* 上下分割（top-bottom） */
 .split.split_tb {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr 1fr;
 }
 
+/* =========================================================
+   各ペイン（画像を操作する領域）
+   ========================================================= */
+
+/* pane（画像1枚の器）
+   - touch-action:none は「ピンチ/スクロール」をJS側で制御するため
+   - min-height は保険（ただし aspect-ratio が効くなら基本不要） */
 .pane {
   position: relative;
-  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
+  border-radius: 14px;
+
+  background: rgba(255, 255, 255, 0.08);
   touch-action: none;
-  position: relative;
-  min-height: 200px;
+
+  /* 選択枠用（active切替） */
+  outline: 2px solid transparent;
+  transition:
+    outline-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  min-height: 200px; /* 保険。不要なら消してOK */
 }
 
+/* 選択中のpane */
+.pane.active {
+  outline-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18) inset;
+}
+
+/* pane内の画像
+   - center基準で transform する前提（JSで translate/scale/rotate）
+   - min-width/min-height 100% で「常に埋める」挙動 */
 .pane img {
   position: absolute;
   left: 50%;
   top: 50%;
+
   width: auto;
   height: auto;
   min-width: 100%;
   min-height: 100%;
 
   transform-origin: center;
+
   user-select: none;
   -webkit-user-drag: none;
-  pointer-events: none;
+  pointer-events: none; /* 画像自体に触らせず、paneで操作を受ける */
 }
 
-/* ラベル半透明、触れない */
+/* ラベル（Before/Afterなど）
+   - 触れないように pointer-events:none */
 .badge {
   position: absolute;
   left: 10px;
   top: 10px;
+
   padding: 6px 10px;
   border-radius: 999px;
   font-size: 13px;
   line-height: 1;
+
   background: rgba(0, 0, 0, 0.28);
   color: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(2px);
@@ -67,50 +109,127 @@
   user-select: none;
 }
 
-.toolrow {
+/* =========================================================
+   下のターゲット切替（左右どっち編集する？的な2ボタン）
+   ========================================================= */
+
+.targetbar {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
+  margin: 10px 0 0;
 }
+
+.tbtn {
+  border-radius: 999px;
+  padding: 10px 12px;
+}
+
+.tbtn.selected {
+  outline: 2px solid rgba(255, 255, 255, 0.65);
+}
+
+/* =========================================================
+   ツールUI（スライダーなど）
+   ========================================================= */
+
+.toolrow,
+.quicktools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px; /* toolrowは12pxでもOK。統一するならここで管理 */
+  margin-top: 10px;
+}
+
+.toolrow {
+  gap: 12px;
+}
+
+/* ツールの見出し */
 .tool .k {
   font-size: 12px;
   opacity: 0.85;
   margin-bottom: 6px;
 }
-.panelBtn {
-  position: sticky;
-  bottom: 12px;
-  margin: 8px auto 0;
-  display: block;
+
+/* range（スライダー） */
+.tool input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  outline: none;
 }
 
+/* つまみ（WebKit系） */
+.tool input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+/* つまみ（Firefox） */
+.tool input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* =========================================================
+   Bottom Sheet（ミニツール表示）
+   ========================================================= */
+
+/* 使うなら表示、使わないなら none にできる設計にしておく */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
   z-index: 40;
+
+  display: none; /* ← 暗幕やめる方針ならこれがデフォ */
 }
 
+/* 下から出るシート本体 */
 .sheet {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 18px 18px 0 0;
+
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 10px 14px 18px;
+
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(6px);
+  border-radius: 16px 16px 0 0;
+
   transform: translateY(110%);
   transition: transform 0.22s ease;
   z-index: 50;
-  padding: 10px 14px 18px;
-  max-width: 720px;
-  margin: 0 auto;
 }
 
+/* 開いた状態 */
 .sheet.open {
   transform: translateY(0);
 }
 
+/* つまみ */
 .sheet-handle {
   width: 44px;
   height: 5px;
@@ -119,107 +238,65 @@
   margin: 6px auto 10px;
 }
 
-/* 選択枠 */
-.pane {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  outline: 2px solid transparent;
-  transition:
-    outline-color 0.15s ease,
-    box-shadow 0.15s ease;
+/* 画面下に張り付くボタン（必要なら） */
+.panelBtn {
+  position: sticky;
+  bottom: 12px;
+  margin: 8px auto 0;
+  display: block;
 }
-.pane.active {
-  outline-color: rgba(255, 255, 255, 0.75);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18) inset;
-}
-
-/* 下の2ボタンバー */
-.targetbar {
+.layout-toggle {
+  width: 42px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 10px 0 0;
-}
-.tbtn {
-  border-radius: 999px;
-  padding: 10px 12px;
-}
-.tbtn.selected {
-  outline: 2px solid rgba(255, 255, 255, 0.65);
-}
-
-/* ミニツール（長押しで出す用） */
-.sheet-backdrop {
-  display: none;
-} /* 暗幕やめる */
-.sheet {
-  background: rgba(255, 255, 255, 0.88);
+  place-items: center;
   backdrop-filter: blur(6px);
-  border-radius: 16px 16px 0 0;
-  max-width: 720px;
-  margin: 0 auto;
 }
 
-.frame {
-  width: 100%;
-  aspect-ratio: 4 / 5; /* ここ超重要 */
+.layout-toggle .icon {
+  width: 18px;
+  height: 18px;
   position: relative;
 }
 
-.split {
-  width: 100%;
+/* 左右 */
+.layout-toggle .split-lr::before,
+.layout-toggle .split-lr::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 7px;
   height: 100%;
-  display: grid;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 3px;
+}
+.layout-toggle .split-lr::before {
+  left: 0;
+}
+.layout-toggle .split-lr::after {
+  right: 0;
 }
 
-.split.split_lr {
-  grid-template-columns: 1fr 1fr;
-}
-
-.split.split_tb {
-  grid-template-rows: 1fr 1fr;
-}
-
-.pane {
-  position: relative;
-  overflow: hidden;
-}
-.tool input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
+/* 上下 */
+.layout-toggle .split-tb::before,
+.layout-toggle .split-tb::after {
+  content: "";
+  position: absolute;
+  left: 0;
   width: 100%;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.2);
-  outline: none;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 3px;
 }
-
-/* つまみ */
-.tool input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid rgba(0, 0, 0, 0.25);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-  cursor: pointer;
+.layout-toggle .split-tb::before {
+  top: 0;
 }
-
-/* Firefox */
-.tool input[type="range"]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid rgba(0, 0, 0, 0.25);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+.layout-toggle .split-tb::after {
+  bottom: 0;
 }
-.quicktools {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 10px;
+.layout-toggle:active {
+  transform: scale(0.97);
 }

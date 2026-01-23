@@ -86,8 +86,10 @@
 }
 .btn.primary {
   flex: 1;
-  border-color: rgba(125, 211, 252, 0.55);
-  background: rgba(125, 211, 252, 0.14);
+  background: rgba(255, 255, 255, 0.35);
+  color: #2f3f2f;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(6px);
 }
 
 /* ghost は基本は“ただの軽いボタン”にしておく（ページ側で味付け） */

@@ -2,13 +2,13 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BeforeAfter Maker - STEP2</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>BeforeAfter Maker - Edit</title>
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/edit.css" />
-
     <script type="module" src="js/edit.js"></script>
   </head>
 
@@ -16,37 +16,34 @@
     <div class="app">
       <div class="topbar">
         <button class="btn ghost" id="backBtn" type="button">←</button>
-        <div class="title">編集</div>
-        <button class="btn ghost" id="toggleLayoutBtn" type="button">左右</button>
+        <div class="title">Edit</div>
+        <button class="layout-toggle" id="toggleLayoutBtn" type="button">
+          <span class="icon split-lr"></span>
+        </button>
       </div>
 
       <div class="content">
         <div class="frame" id="frame">
           <div class="split split_lr" id="split"></div>
         </div>
-        <div class="quicktools" id="quickTools">
-          <button class="btn ghost" id="zoomBtn" type="button">拡大</button>
-          <button class="btn ghost" id="rotateBtn" type="button">回転</button>
-        </div>
+        <div class="quicktools" id="quickTools"></div>
 
         <div class="tool">
-          <div class="k">拡大</div>
+          <div class="k">scale</div>
           <input type="range" id="scaleRange" min="0.7" max="2.5" step="0.01" value="1" />
         </div>
 
         <div class="tool">
-          <div class="k">回転</div>
+          <div class="k">rotate</div>
           <input type="range" id="rotateRange" min="-45" max="45" step="1" value="0" />
         </div>
 
         <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
-
-        <div class="small">写真をドラッグして位置調整できます（ラベルは固定表示）</div>
       </div>
 
       <div class="footer">
-        <button class="btn ghost" id="resetBtn" type="button">リセット</button>
-        <button class="btn primary" id="nextBtn" type="button">プレビューへ</button>
+        <button class="btn ghost" id="resetBtn" type="button">Reset</button>
+        <button class="btn primary" id="nextBtn" type="button">Preview</button>
       </div>
     </div>
   </body>

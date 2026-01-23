@@ -20,10 +20,6 @@ const sheetBackdrop = document.getElementById("sheetBackdrop"); // optional
 // bottom target buttons
 const targetBar = document.getElementById("targetBar");
 
-// NEW: quick tool buttons
-const zoomBtn = document.getElementById("zoomBtn");
-const rotateBtn = document.getElementById("rotateBtn");
-
 // ---- state ----
 let activeIndex = 0;
 let drag = null;
@@ -126,7 +122,10 @@ function render() {
   }
 
   split.className = "split " + (p.layout || "split_lr");
-  if (toggleLayoutBtn) toggleLayoutBtn.textContent = (p.layout === "split_lr") ? "左右" : "上下";
+  if (toggleLayoutBtn) {
+  toggleLayoutBtn.innerHTML = `<span class="icon ${p.layout === "split_lr" ? "split-lr" : "split-tb"}"></span>`;
+  toggleLayoutBtn.setAttribute("aria-label", p.layout === "split_lr" ? "左右分割" : "上下分割");
+}
 
   split.innerHTML = "";
 
@@ -220,8 +219,25 @@ rotateRange?.addEventListener("input", () => {
 });
 
 // ---------------------
-// Drag position
+// Drag + Pinch (2 pointers)
 // ---------------------
+
+// 追跡中のポインタ（最大2本だけ使う）
+const pointers = new Map(); // pointerId -> {x,y}
+let gesture = null; // { type:'drag'|'pinch', ... }
+
+function dist(a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.hypot(dx, dy);
+}
+function angle(a, b) {
+  return Math.atan2(b.y - a.y, b.x - a.x); // rad
+}
+function center(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
 split.addEventListener("pointerdown", (e) => {
   const pane = e.target.closest(".pane");
   if (!pane) return;
@@ -234,36 +250,147 @@ split.addEventListener("pointerdown", (e) => {
   const ed = p.edits[activeIndex];
   if (!ed) return;
 
-  drag = {
-    pointerId: e.pointerId,
-    startX: e.clientX,
-    startY: e.clientY,
-    baseX: ed.x,
-    baseY: ed.y,
-  };
+  // iOS/Chromeで安定させる定番：スクロール等を抑止
+  e.preventDefault?.();
 
   pane.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  // 1本目: drag開始
+  if (pointers.size === 1) {
+    gesture = {
+      type: "drag",
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: ed.x,
+      baseY: ed.y,
+    };
+    return;
+  }
+
+  // 2本目が入ったら pinch開始（dragは終了）
+  if (pointers.size === 2) {
+    const pts = [...pointers.values()];
+    const a = pts[0];
+    const b = pts[1];
+
+    gesture = {
+      type: "pinch",
+      // pinch開始時の2点情報
+      startA: { ...a },
+      startB: { ...b },
+      startDist: dist(a, b),
+      startAng: angle(a, b),
+      startCenter: center(a, b),
+
+      // 編集の基準値
+      baseScale: ed.scale,
+      baseRotate: ed.rotate,
+      baseX: ed.x,
+      baseY: ed.y,
+    };
+  }
 });
 
 split.addEventListener("pointermove", (e) => {
-  if (!drag) return;
+  if (!pointers.has(e.pointerId)) return;
 
-  const dx = e.clientX - drag.startX;
-  const dy = e.clientY - drag.startY;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
   const p = normalize();
   const ed = p.edits[activeIndex];
-  if (!ed) return;
+  if (!ed || !gesture) return;
 
-  ed.x = Math.round(drag.baseX + dx);
-  ed.y = Math.round(drag.baseY + dy);
+  // ---- 1本指ドラッグ ----
+  if (gesture.type === "drag") {
+    // pinch中にdragが走るのを防ぐ（2本になったらpinchへ）
+    if (pointers.size !== 1) return;
 
-  saveProject(p);
-  updateOne(activeIndex);
+    const dx = e.clientX - gesture.startX;
+    const dy = e.clientY - gesture.startY;
+
+    ed.x = Math.round(gesture.baseX + dx);
+    ed.y = Math.round(gesture.baseY + dy);
+
+    saveProject(p);
+    updateOne(activeIndex);
+    return;
+  }
+
+  // ---- 2本指ピンチ（スケール + 回転 + 中心固定の平行移動）----
+  if (gesture.type === "pinch") {
+    if (pointers.size !== 2) return;
+
+    const pts = [...pointers.values()];
+    const a = pts[0];
+    const b = pts[1];
+
+    const curDist = dist(a, b);
+    const curAng = angle(a, b);
+    const curCenter = center(a, b);
+
+    // スケール倍率（開始距離 대비）
+    const ratio = gesture.startDist ? (curDist / gesture.startDist) : 1;
+
+    // スケール更新（制限は好みで）
+    const nextScale = Math.max(0.4, Math.min(3.0, gesture.baseScale * ratio));
+
+    // 角度差分（rad -> deg）
+    const dAng = curAng - gesture.startAng;
+    const nextRotate = gesture.baseRotate + (dAng * 180) / Math.PI;
+
+    // 中心固定：指の中心が動いた分だけ画像も追従
+    const dcx = curCenter.x - gesture.startCenter.x;
+    const dcy = curCenter.y - gesture.startCenter.y;
+    const nextX = Math.round(gesture.baseX + dcx);
+    const nextY = Math.round(gesture.baseY + dcy);
+
+    ed.scale = Math.round(nextScale * 1000) / 1000;
+    ed.rotate = Math.round(nextRotate * 10) / 10;
+    ed.x = nextX;
+    ed.y = nextY;
+
+    saveProject(p);
+    updateOne(activeIndex);
+    syncPanel(); // スライダーも追従させたいなら（重いなら外してOK）
+  }
 });
 
-split.addEventListener("pointerup", () => (drag = null));
-split.addEventListener("pointercancel", () => (drag = null));
+function endPointer(e) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.delete(e.pointerId);
+
+  // 2本 -> 1本に戻ったら、残った指でドラッグを再開したい場合
+  if (pointers.size === 1) {
+    const [remainId, pt] = pointers.entries().next().value;
+    const p = normalize();
+    const ed = p.edits[activeIndex];
+    if (!ed) return;
+
+    gesture = {
+      type: "drag",
+      pointerId: remainId,
+      startX: pt.x,
+      startY: pt.y,
+      baseX: ed.x,
+      baseY: ed.y,
+    };
+    return;
+  }
+
+  // 0本なら終了
+  if (pointers.size === 0) {
+    gesture = null;
+  }
+}
+
+split.addEventListener("pointerup", endPointer);
+split.addEventListener("pointercancel", endPointer);
+split.addEventListener("pointerleave", (e) => {
+  // leaveが頻発する端末もあるので、安全に終了だけ
+  if (pointers.has(e.pointerId)) endPointer(e);
+});
 
 // ---------------------
 // Reset
@@ -284,58 +411,6 @@ resetOneBtn?.addEventListener("click", () => {
   syncPanel();
 });
 
-// ---------------------
-// Quick tools (tap = nudge, long-press = open slider)
-// ---------------------
-
-function attachHold(btn, mode, onTap){
-  if(!btn) return;
-
-  btn.addEventListener("pointerdown", ()=>{
-    holdTimer = setTimeout(()=>{
-      openSheet(mode); // mode: "scale" or "rotate"
-    }, 380);
-  });
-
-  const clearHold = ()=>{
-    if(holdTimer){
-      clearTimeout(holdTimer);
-      holdTimer = null;
-    }
-  };
-
-  btn.addEventListener("pointerup", ()=>{
-    // 長押しで sheet が開いた場合は tap を走らせない
-    const opened = sheet?.classList.contains("open");
-    clearHold();
-    if(opened) return;
-    onTap?.();
-  });
-
-  btn.addEventListener("pointercancel", clearHold);
-  btn.addEventListener("pointerleave", clearHold);
-}
-attachHold(zoomBtn, "scale", ()=>{
-  const p = normalize();
-  const ed = p.edits[activeIndex];
-  if(!ed) return;
-
-  ed.scale = Math.min(2.5, Math.round((ed.scale + 0.05) * 100) / 100);
-  saveProject(p);
-  syncPanel();
-  updateOne(activeIndex);
-});
-
-attachHold(rotateBtn, "rotate", ()=>{
-  const p = normalize();
-  const ed = p.edits[activeIndex];
-  if(!ed) return;
-
-  ed.rotate = Math.max(-45, Math.min(45, ed.rotate + 3));
-  saveProject(p);
-  syncPanel();
-  updateOne(activeIndex);
-});
 
 // ---------------------
 // Nav
