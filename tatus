@@ -1,5 +1,0 @@
-[33m12f858b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m refactor(css): separate components and gallery styles, clean structure
-[33m042985a[m feat: apply belle brand style and refine index UI layout
-[33mb7ddad4[m feat: enable one-tap image picker on new project creation (iOS PWA UX)
-[33m7078312[m edit: add hybrid controls (direct touch + slider adjustments)
-[33mbb52db6[m fix: device save via share sheet (ios friendly)
