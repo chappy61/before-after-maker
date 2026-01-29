@@ -18,10 +18,51 @@ body.page-gallery .content {
 }
 
 /* ---- Topbar ---- */
-.topbar-actions {
+.topbar {
+  position: relative;
+  height: 52px;
   display: flex;
-  gap: 10px;
   align-items: center;
+  padding: 0 12px;
+}
+
+/* 戻るボタン（矢印のみ） */
+.back-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+
+/* タイトル完全センター */
+.topbar .title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  opacity: 0.95;
+}
+
+/* 右側アクション（削除ボタン用） */
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+}
+
+/* 選択モードの削除ボタン */
+.btn.danger {
+  background: rgba(255, 80, 80, 0.18);
+  border: 1px solid rgba(255, 120, 120, 0.35);
 }
 
 /* ギャラリーの ghost ボタンは上品に */
@@ -151,6 +192,65 @@ details[open] .gchev {
   padding: 10px 12px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.18);
+  position: relative;
+}
+
+.gcheck {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  pointer-events: none;
+}
+
+/* 選択モードになったらチェック枠だけ出す */
+.gitem.selectable .gcheck {
+  opacity: 0.35;
+}
+
+/* 選択されたら強調 */
+.gitem.is-selected .gcheck {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* summaryにもチェックを置いてる場合（見た目のみ） */
+.gsummary,
+.gsummary-month {
+  position: relative;
+}
+.gsummary-check {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  pointer-events: none;
+}
+.gsummary.selectable .gsummary-check,
+.gsummary-month.selectable .gsummary-check {
+  opacity: 0.25;
 }
 
 .gitem {
@@ -235,4 +335,63 @@ details[open] .gchev {
   opacity: 0.92;
   display: inline-flex;
   align-items: center;
+}
+/* ===== Overlay Full View ===== */
+.overlay.hidden {
+  display: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.78);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.overlay-box {
+  width: min(92vw, 520px);
+  height: min(92vh, 820px);
+  background: rgba(20, 30, 20, 0.95);
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 18px;
+}
+
+.overlay-body {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.overlay-body img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+/* オーバーレイ中は背面スクロール禁止 */
+body.overlay-open {
+  overflow: hidden;
+  touch-action: none;
 }

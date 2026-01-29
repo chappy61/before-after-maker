@@ -17,13 +17,9 @@
   <body class="page-gallery">
     <div class="app">
       <div class="topbar">
-        <a class="btn ghost back" href="index.html" aria-label="戻る">←</a>
-        <div class="title">Gallery</div>
-
-        <div class="topbar-actions">
-          <button class="btn ghost" id="selectModeBtn">選択</button>
-          <button class="btn ghost danger" id="deleteSelectedBtn" disabled>削除</button>
-        </div>
+         <button class="back-btn" onclick="location.href='index.html'" aria-label="戻る">←</button>        <div class="title">Gallery</div>
+        <!-- 右側は常に同じ幅の枠を置く（タイトルがズレない） -->
+        <div class="topbar-right" id="topbarRight"></div>
       </div>
 
       <div class="content">

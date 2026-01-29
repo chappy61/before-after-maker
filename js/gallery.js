@@ -1,104 +1,103 @@
-import { listGallery, deleteGalleryItem } from "./db.js";
+import { listGallery, deleteGalleryItem, getGalleryItem } from "./db.js";
+import { requireAuthOrRedirect } from "./passcodeAuth.js";
 
+await requireAuthOrRedirect("./k9x3.html");
+
+// ---------------------
+// DOM
+// ---------------------
 const galleryEl = document.getElementById("gallery");
 const yearbarEl = document.getElementById("yearbar");
-
-const selectBtn = document.getElementById("selectModeBtn");
-const deleteBtn = document.getElementById("deleteSelectedBtn");
+const topbarRight = document.getElementById("topbarRight");
 
 // ---------------------
 // State
 // ---------------------
 let selectMode = false;
-const selected = new Set();
+const selectedIds = new Set(); // 画像idのみ入れる
 
-let selectedYear = null; // 表示する年（フッターで切替）
-let objectUrls = [];     // createObjectURL 管理（再描画で解放）
+let selectedYear = null;
+let allItems = []; // { id, createdAt(ms), thumbUrl, meta }
 
-// データ保持（年切替のために一度読み込む）
-let allItems = [];
+// overlay
+let overlayOpen = false;
 
 // ---------------------
 // Utils
 // ---------------------
 function pad2(n) { return String(n).padStart(2, "0"); }
-
-function dateKey(ts) {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; // YYYY-MM-DD
-}
+function yearKey(ts) { return String(new Date(ts).getFullYear()); }
 function ymKey(ts) {
   const d = new Date(ts);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // YYYY-MM
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
 }
-function yearKey(ts) { return String(new Date(ts).getFullYear()); }
-
+function dateKey(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
 function dateLabelFromKey(key) {
   const [, mm, dd] = key.split("-");
   return `${mm}/${dd}`;
 }
-function ymLabel(key) {
-  const [y, m] = key.split("-");
-  return `${y}年${m}月`;
-}
-function timeLabel(ts) {
-  const d = new Date(ts);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
 function safeHTML(s) {
   return String(s).replace(/[&<>"']/g, (m) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]
   ));
 }
-
-function revokeAllObjectUrls() {
-  for (const u of objectUrls) {
-    try { URL.revokeObjectURL(u); } catch {}
-  }
-  objectUrls = [];
+function getYearsFromAllItems() {
+  const set = new Set(allItems.map(it => yearKey(it.createdAt)));
+  return [...set].sort().reverse();
 }
 
 // ---------------------
-// UI helpers
+// Select UI (Topbar right)
 // ---------------------
-function updateTopbarUI() {
-  if (selectBtn) selectBtn.textContent = selectMode ? "完了" : "選択";
+function renderTopbarRight() {
+  if (!topbarRight) return;
 
-  if (deleteBtn) {
-    deleteBtn.disabled = selected.size === 0;
-    deleteBtn.textContent = selected.size ? `削除(${selected.size})` : "削除";
+  if (!selectMode) {
+    topbarRight.innerHTML = ""; // 何も出さない（タイトルはズレない）
+    return;
   }
+
+  const n = selectedIds.size;
+  topbarRight.innerHTML = `
+    <button class="btn ghost danger" id="deleteBtn" ${n ? "" : "disabled"}>
+      削除${n ? `(${n})` : ""}
+    </button>
+  `;
+
+  const btn = document.getElementById("deleteBtn");
+  btn?.addEventListener("click", onDeleteSelected);
 }
 
-function setSelectMode(v) {
-  selectMode = v;
-  selected.clear();
-  updateTopbarUI();
-  // 選択表示反映のため再描画
-  renderCurrentYear();
+function enterSelectMode() {
+  if (selectMode) return;
+  selectMode = true;
+  renderTopbarRight();
+  // 選択モードに入った瞬間に「チェック表示」を有効化
+  refreshSelectionMarks();
 }
-
-function setYear(y) {
-  if (selectedYear === y) return;
-
-  selectedYear = y;
-  // 年を変えたら選択は解除（事故防止）
+function exitSelectMode() {
   selectMode = false;
-  selected.clear();
-  updateTopbarUI();
+  selectedIds.clear();
+  renderTopbarRight();
+  refreshSelectionMarks();
+}
 
-  renderYearbar();
-  renderCurrentYear();
+function toggleSelected(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+
+  renderTopbarRight();
+  refreshSelectionMarks();
 }
 
 // ---------------------
-// Data grouping
+// Grouping (Year -> Month -> Day)
 // ---------------------
 function groupByMonthAndDay(items) {
-  // monthMap: YYYY-MM -> dayMap
-  const monthMap = new Map();
-
+  const monthMap = new Map(); // ym -> dayMap
   for (const it of items) {
     const ym = ymKey(it.createdAt);
     const d = dateKey(it.createdAt);
@@ -110,19 +109,10 @@ function groupByMonthAndDay(items) {
     dayMap.get(d).push(it);
   }
 
-  // sort inside each day (newest first)
   for (const [, dayMap] of monthMap) {
-    for (const [, arr] of dayMap) {
-      arr.sort((a, b) => b.createdAt - a.createdAt);
-    }
+    for (const [, arr] of dayMap) arr.sort((a, b) => b.createdAt - a.createdAt);
   }
-
   return monthMap;
-}
-
-function getYearsFromAllItems() {
-  const set = new Set(allItems.map(it => yearKey(it.createdAt)));
-  return [...set].sort().reverse(); // newest year first
 }
 
 // ---------------------
@@ -137,12 +127,11 @@ function renderYearbar() {
     return;
   }
 
-  // selectedYear が未設定なら最新年
   if (!selectedYear) selectedYear = years[0];
 
-  // ★ 年が1個なら「固定表示」にする（でも出す！）
   if (years.length === 1) {
-    yearbarEl.innerHTML = `<div class="yearfixed">${safeHTML(years[0])}</div>`;
+    // 年自体も長押し選択できるように data-year を付ける
+    yearbarEl.innerHTML = `<div class="yearfixed" data-year="${safeHTML(years[0])}">${safeHTML(years[0])}</div>`;
     return;
   }
 
@@ -154,19 +143,21 @@ function renderYearbar() {
   yearbarEl.innerHTML = chips;
 
   yearbarEl.onclick = (e) => {
+    // 通常タップは年切替
+    if (selectMode) return; // 選択中は切替しない（事故防止）
     const btn = e.target.closest(".yearchip");
     if (!btn) return;
-    setYear(String(btn.dataset.year));
+    selectedYear = String(btn.dataset.year);
+    renderYearbar();
+    renderCurrentYear();
   };
 }
 
 // ---------------------
-// Render: Current Year (Month -> Day)
+// Render: Current Year
 // ---------------------
 function renderCurrentYear() {
   if (!galleryEl) return;
-
-  revokeAllObjectUrls();
 
   const years = getYearsFromAllItems();
   if (years.length === 0) {
@@ -175,15 +166,12 @@ function renderCurrentYear() {
   }
   if (!selectedYear) selectedYear = years[0];
 
-  // 選択中の年だけに絞る
   const items = allItems.filter(it => yearKey(it.createdAt) === selectedYear);
 
-  // 月→日グルーピング
   const monthMap = groupByMonthAndDay(items);
   const months = [...monthMap.keys()].sort().reverse();
 
-  // ★ 月を1つだけ使う（最新 or 1月固定）
-  const targetMonth = months.find(m => m.endsWith("-01")) || months[0]; // 1月優先
+  const targetMonth = months.find(m => m.endsWith("-01")) || months[0];
   const monthList = targetMonth ? [targetMonth] : [];
 
   const monthSections = monthList.map((ym) => {
@@ -195,29 +183,24 @@ function renderCurrentYear() {
       const label = dateLabelFromKey(dayKeyStr);
 
       const thumbs = arr.map((it) => {
-        const url = URL.createObjectURL(it.thumbBlob);
-        objectUrls.push(url);
-
-        const t = timeLabel(it.createdAt);
+        const url = it.thumbUrl;
         const id = safeHTML(it.id);
-
-        const isSel = selected.has(String(it.id));
-        const selClass = isSel ? " is-selected" : "";
-
         return `
-          <div class="gitem${selClass}" data-id="${id}" title="${safeHTML(dayKeyStr)} ${t}">
-            <img src="${url}" alt="thumb" />
-            <div class="gtime">${t}</div>
+          <div class="gitem" data-id="${id}">
+            <img src="${safeHTML(url)}" alt="thumb" />
+            <div class="gcheck" aria-hidden="true">✓</div>
           </div>
         `;
       }).join("");
 
+      // 日付summaryにもチェック付ける（まとめ選択用）
       return `
-        <details class="gsection">
+        <details class="gsection" data-date="${safeHTML(dayKeyStr)}">
           <summary class="gsummary">
             <div class="gmeta">
               <div class="gdate">${label}</div>
             </div>
+            <div class="gsummary-check" aria-hidden="true">✓</div>
             <div class="gchev">▼</div>
           </summary>
           <div class="ggrid">
@@ -227,12 +210,14 @@ function renderCurrentYear() {
       `;
     }).join("");
 
+    // 月summaryにもチェック
     return `
-      <details class="gmonth" open>
+      <details class="gmonth" open data-month="${safeHTML(ym)}">
         <summary class="gsummary gsummary-month">
           <div class="gmeta">
             <div class="gdate">${ym.split("-")[1]}</div>
           </div>
+          <div class="gsummary-check" aria-hidden="true">✓</div>
           <div class="gchev">▼</div>
         </summary>
         <div class="gmonth-body">
@@ -244,16 +229,14 @@ function renderCurrentYear() {
 
   galleryEl.innerHTML = monthSections;
 
-  // イベントを付け直す
-  bindGalleryEvents();
   bindAccordion();
-  updateTopbarUI();
+  bindPressAndClicks();
+  refreshSelectionMarks();
+  renderTopbarRight();
 }
 
 // ---------------------
 // Accordion behavior
-// 月：開いたら他の月は閉じる
-// 日：開いたら同じ月の他の日は閉じる
 // ---------------------
 function bindAccordion() {
   if (!galleryEl) return;
@@ -261,117 +244,270 @@ function bindAccordion() {
   galleryEl.querySelectorAll(".gmonth").forEach((monthDetails) => {
     monthDetails.addEventListener("toggle", () => {
       if (!monthDetails.open) return;
-
-      galleryEl.querySelectorAll(".gmonth").forEach((d) => {
-        if (d !== monthDetails) d.open = false;
-      });
+      galleryEl.querySelectorAll(".gmonth").forEach((d) => { if (d !== monthDetails) d.open = false; });
     });
   });
 
   galleryEl.querySelectorAll(".gsection").forEach((dayDetails) => {
     dayDetails.addEventListener("toggle", () => {
       if (!dayDetails.open) return;
-
       const monthBody = dayDetails.closest(".gmonth-body") || galleryEl;
-      monthBody.querySelectorAll(".gsection").forEach((d) => {
-        if (d !== dayDetails) d.open = false;
-      });
+      monthBody.querySelectorAll(".gsection").forEach((d) => { if (d !== dayDetails) d.open = false; });
     });
   });
 }
 
 // ---------------------
-// Gallery interactions
+// Overlay (full view) : ✖ でしか閉じない
 // ---------------------
-function toggleSelect(itemEl, id) {
-  if (selected.has(id)) {
-    selected.delete(id);
-    itemEl.classList.remove("is-selected");
-  } else {
-    selected.add(id);
-    itemEl.classList.add("is-selected");
-  }
-  updateTopbarUI();
+function createOverlayIfNeeded() {
+  if (document.getElementById("overlay")) return;
+
+  const el = document.createElement("div");
+  el.id = "overlay";
+  el.className = "overlay hidden";
+  el.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); });
+
+  el.innerHTML = `
+    <div class="overlay-box" role="dialog" aria-modal="true">
+      <button class="overlay-close" id="overlayClose" aria-label="閉じる">✕</button>
+      <div class="overlay-body">
+        <img id="overlayImg" alt="full" />
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(el);
+  document.getElementById("overlayClose").addEventListener("click", closeOverlay);
+
+  window.addEventListener("keydown", (e) => {
+    if (!overlayOpen) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); }
+  }, { capture: true });
 }
 
-function bindGalleryEvents() {
-  if (!galleryEl) return;
+async function openOverlayById(id) {
+  createOverlayIfNeeded();
+  overlayOpen = true;
 
-  galleryEl.onclick = (e) => {
+  const overlay = document.getElementById("overlay");
+  const img = document.getElementById("overlayImg");
+
+  overlay.classList.remove("hidden");
+  document.body.classList.add("overlay-open");
+  img.removeAttribute("src");
+
+  const item = await getGalleryItem(id);
+  if (!item?.fullUrl) {
+    closeOverlay();
+    alert("画像の取得に失敗しました");
+    return;
+  }
+
+  img.src = item.fullUrl;
+}
+
+function closeOverlay() {
+  overlayOpen = false;
+  const overlay = document.getElementById("overlay");
+  const img = document.getElementById("overlayImg");
+  if (img) img.removeAttribute("src");
+  if (overlay) overlay.classList.add("hidden");
+  document.body.classList.remove("overlay-open");
+}
+
+// ---------------------
+// Selection marks
+// ---------------------
+function refreshSelectionMarks() {
+  // 画像チェック
+  document.querySelectorAll(".gitem").forEach((el) => {
+    const id = String(el.dataset.id);
+    const on = selectMode && selectedIds.has(id);
+    el.classList.toggle("is-selected", on);
+    el.classList.toggle("selectable", selectMode);
+  });
+
+  // summary（見た目だけ。実際の選択は長押しハンドラでまとめ処理）
+  document.querySelectorAll(".gsummary, .gsummary-month").forEach((sum) => {
+    sum.classList.toggle("selectable", selectMode);
+  });
+}
+
+// ---------------------
+// Long press + click binding
+// ---------------------
+function bindPressAndClicks() {
+  // 通常タップ：画像はオーバーレイ（選択モードならチェック）
+  galleryEl.onclick = async (e) => {
     const item = e.target.closest(".gitem");
     if (!item) return;
 
     const id = String(item.dataset.id);
 
     if (selectMode) {
-      toggleSelect(item, id);
+      toggleSelected(id);
       return;
     }
 
-    window.location.href = `gallery.html?id=${encodeURIComponent(id)}`;
+    try {
+      await openOverlayById(id);
+    } catch (err) {
+      console.error(err);
+      alert(`表示に失敗しました\n${err?.message || err}`);
+    }
   };
 
-  // 長押しで選択モード（スマホ）
-  let pressTimer = null;
-  let pressTarget = null;
+  // 長押し：画像/日付/月/年
+  installLongPress(galleryEl, (target) => {
+    // 画像
+    const item = target.closest?.(".gitem");
+    if (item) {
+      enterSelectMode();
+      toggleSelected(String(item.dataset.id));
+      return;
+    }
 
-  const startPress = (ev) => {
-    const item = ev.target.closest(".gitem");
-    if (!item) return;
+    // 日付（その日まとめて）
+    const daySummary = target.closest?.(".gsection > summary");
+    if (daySummary) {
+      const section = daySummary.closest(".gsection");
+      const dayKeyStr = section?.dataset?.date;
+      if (!dayKeyStr) return;
 
-    pressTarget = item;
-    if (selectMode) return;
+      enterSelectMode();
 
-    pressTimer = setTimeout(() => {
-      selectMode = true;
-      selected.clear();
-      const id = String(pressTarget.dataset.id);
-      toggleSelect(pressTarget, id);
-      updateTopbarUI();
-    }, 450);
+      // その日配下の画像IDを全部
+      const ids = [...section.querySelectorAll(".gitem")].map(x => String(x.dataset.id));
+      bulkToggle(ids);
+      return;
+    }
+
+    // 月（その月まとめて）
+    const monthSummary = target.closest?.(".gmonth > summary");
+    if (monthSummary) {
+      const month = monthSummary.closest(".gmonth");
+      if (!month) return;
+
+      enterSelectMode();
+
+      const ids = [...month.querySelectorAll(".gitem")].map(x => String(x.dataset.id));
+      bulkToggle(ids);
+      return;
+    }
+
+    // 年（表示中の年を全部）
+    const yearChip = target.closest?.(".yearchip");
+    const yearFixed = target.closest?.(".yearfixed");
+    const y = yearChip?.dataset?.year || yearFixed?.dataset?.year;
+    if (y) {
+      enterSelectMode();
+      const ids = allItems
+        .filter(it => yearKey(it.createdAt) === String(y))
+        .map(it => String(it.id));
+      bulkToggle(ids);
+    }
+  });
+
+  // yearbarの長押しも拾えるように（yearbar要素にも）
+  installLongPress(yearbarEl, (target) => {
+    const yearChip = target.closest?.(".yearchip");
+    const yearFixed = target.closest?.(".yearfixed");
+    const y = yearChip?.dataset?.year || yearFixed?.dataset?.year;
+    if (!y) return;
+
+    enterSelectMode();
+    const ids = allItems
+      .filter(it => yearKey(it.createdAt) === String(y))
+      .map(it => String(it.id));
+    bulkToggle(ids);
+  });
+}
+
+function bulkToggle(ids) {
+  // 全部選択されてたら解除、そうでなければ全選択
+  const allOn = ids.length > 0 && ids.every(id => selectedIds.has(id));
+  if (allOn) ids.forEach(id => selectedIds.delete(id));
+  else ids.forEach(id => selectedIds.add(id));
+
+  renderTopbarRight();
+  refreshSelectionMarks();
+}
+
+// 長押し検出（背景スクロールや誤作動を減らす）
+function installLongPress(root, onFire) {
+  if (!root) return;
+
+  let timer = null;
+  let startX = 0;
+  let startY = 0;
+  let fired = false;
+
+  const HOLD_MS = 450;
+  const MOVE_TOL = 10;
+
+  root.addEventListener("pointerdown", (e) => {
+    fired = false;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    timer = setTimeout(() => {
+      fired = true;
+      try { onFire(e.target); } catch {}
+    }, HOLD_MS);
+  });
+
+  root.addEventListener("pointermove", (e) => {
+    if (!timer) return;
+    const dx = Math.abs(e.clientX - startX);
+    const dy = Math.abs(e.clientY - startY);
+    if (dx > MOVE_TOL || dy > MOVE_TOL) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  });
+
+  const end = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
   };
 
-  const endPress = () => {
-    if (pressTimer) clearTimeout(pressTimer);
-    pressTimer = null;
-    pressTarget = null;
-  };
+  root.addEventListener("pointerup", end);
+  root.addEventListener("pointercancel", end);
+  root.addEventListener("pointerleave", end);
 
-  galleryEl.onpointerdown = startPress;
-  galleryEl.onpointerup = endPress;
-  galleryEl.onpointercancel = endPress;
-  galleryEl.onpointerleave = endPress;
+  // 長押し発火した直後のclickを抑制したい場合はここで対処できる
 }
 
 // ---------------------
-// Topbar actions
+// Delete action
 // ---------------------
-selectBtn?.addEventListener("click", () => {
-  setSelectMode(!selectMode);
-});
+async function onDeleteSelected() {
+  if (selectedIds.size === 0) return;
 
-deleteBtn?.addEventListener("click", async () => {
-  if (selected.size === 0) return;
+  if (!confirm(`${selectedIds.size}件を削除しますか？`)) return;
 
-  if (!confirm(`${selected.size}件を削除しますか？`)) return;
-
-  for (const id of selected) {
+  for (const id of selectedIds) {
     await deleteGalleryItem(id);
   }
 
-  // データを再取得してUI更新
   await loadAllItems();
-  setSelectMode(false);
-});
+  exitSelectMode();
+}
 
 // ---------------------
 // Data loading
 // ---------------------
 async function loadAllItems() {
-  // たくさんあっても年で切替できるので上限は大きめ
-  allItems = await listGallery(3650);
+  const rows = await listGallery(3650);
 
-  // 年が消えた/変わった時の保険
+  allItems = (rows || []).map((r) => ({
+    id: r.id,
+    createdAt: new Date(r.created_at).getTime(),
+    thumbUrl: r.thumbUrl,
+    meta: r.meta || {},
+  }));
+
   const years = getYearsFromAllItems();
   if (years.length === 0) {
     selectedYear = null;
@@ -381,10 +517,8 @@ async function loadAllItems() {
 
   renderYearbar();
   renderCurrentYear();
+  renderTopbarRight();
 }
-
-// unload: objectURL解放
-window.addEventListener("beforeunload", revokeAllObjectUrls);
 
 // init
 loadAllItems();

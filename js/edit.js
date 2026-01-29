@@ -554,11 +554,17 @@ async function saveBoth() {
 saveBtn?.addEventListener("click", async () => {
   try {
     await saveBoth();
-  } catch (err) {
-    console.error(err);
-    alert("保存に失敗しました");
-  }
+ } catch (err) {
+  console.error("SAVE ERROR:", err);
+  console.error("status:", err?.status);
+  console.error("message:", err?.message);
+  console.error("details:", err?.details);
+  console.error("hint:", err?.hint);
+  alert(`保存に失敗しました\n${err?.message || err}`);
+}
+
 });
+
 
 // ============================================================
 // Nav
@@ -567,7 +573,12 @@ backBtn?.addEventListener("click", () => {
   window.location.href = "index.html";
 });
 
+import { requireAuthOrRedirect } from "./passcodeAuth.js";
+
 // ============================================================
 // Init
 // ============================================================
-render();
+(async () => {
+  await requireAuthOrRedirect("./k9x3.html"); // 未ログインはここで弾く
+  render();
+})();

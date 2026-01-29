@@ -1,0 +1,233 @@
+/* passcode.css
+   - base.css の Design Tokens を利用
+   - ここでは “ログイン画面固有のレイアウト/見た目” だけを書く
+*/
+
+/* アプリ枠の中で縦に整列 */
+.pc-wrap {
+  width: min(520px, 100%);
+  border-radius: var(--radius);
+  overflow: hidden;
+  padding: 22px 18px calc(18px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* 見出し */
+.pc-head {
+  text-align: center;
+  padding-top: 8px;
+}
+
+.pc-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+
+  background: color-mix(in srgb, var(--card) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
+
+  color: var(--title);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.pc-title {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  margin-bottom: 10px;
+}
+
+/* ●●●● */
+.pc-dots {
+  display: flex;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 18px;
+
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  transform: scale(1);
+
+  transition:
+    background 0.12s ease,
+    transform 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.dot.filled {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+  transform: scale(1.06);
+}
+
+/* テンキー */
+.pc-pad {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.row {
+  width: 90%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  justify-items: center;
+}
+
+.key {
+  width: 66px;
+  height: 66px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+
+  /* ガラス感 */
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0.12) 40%,
+    rgba(0, 0, 0, 0.12) 70%,
+    rgba(0, 0, 0, 0.18) 100%
+  );
+
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+
+  /* iOSっぽいレイヤー影 */
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.28),
+    /* 外側の影 */ inset 0 1px 2px rgba(255, 255, 255, 0.35),
+    /* 上ハイライト */ inset 0 -2px 6px rgba(0, 0, 0, 0.25); /* 下陰影 */
+
+  transition:
+    transform 0.08s ease,
+    filter 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.key:active {
+  transform: scale(0.93);
+  filter: brightness(1.08);
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.35),
+    inset 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.key.ghost {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.key.func {
+  font-size: 18px;
+}
+
+/* 下の “クリア” */
+.pc-actions {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.action {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.12);
+
+  color: rgba(255, 255, 255, 0.78);
+  padding: 10px 16px;
+}
+
+/* メッセージ */
+.pc-foot {
+  min-height: 20px;
+}
+
+.pc-note {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* 間違い時の揺れ（JSで .shake 付与） */
+.shake {
+  animation: shake 0.28s ease-in-out 0s 2;
+}
+
+@keyframes shake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+  75% {
+    transform: translateX(-4px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+#pcDots {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 8px 0 14px;
+}
+
+#pcDots .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+}
+
+#pcDots .dot.filled {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+.passcode-pad {
+  margin-top: 12px; /* ← 上の余白縮める */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; /* ← row同士の間 */
+}
