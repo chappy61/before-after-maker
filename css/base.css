@@ -22,7 +22,8 @@
 
   /* Fonts */
   --font-ui:
-    system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+    system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI",
+    Roboto, "Noto Sans JP", sans-serif;
   --font-title: "Cormorant Garamond", serif;
 }
 
@@ -104,7 +105,11 @@ body::before {
   z-index: 0;
 
   /* 画面全体のビネット（空白が「間」になる） */
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.22) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
 }
 
 /* ---------------------------------------------------------
