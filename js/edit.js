@@ -3,7 +3,7 @@
 // - Split view (LR/TB)
 // - Active pane selection
 // - Drag / pinch zoom / rotate (pointer events)
-// - Label overlay per pane (position drag), color toggle (W/B)
+// - Label overlay per pane (position drag), color toggle (W/B), ON/OFF
 // - Save: export PNG + save to gallery + share/download
 // ------------------------------------------------------------
 
@@ -25,6 +25,7 @@ const scaleRange = document.getElementById("scaleRange");
 const rotateRange = document.getElementById("rotateRange");
 
 const colorToggle = document.getElementById("colorToggle");
+const labelToggle = document.getElementById("labelToggle");
 const saveBtn = document.getElementById("saveBtn");
 
 const resetOneBtn = document.getElementById("resetOneBtn");
@@ -95,6 +96,7 @@ async function saveToDevice(blob, filename) {
 
 // ============================================================
 // Project normalize (schema guard)
+// NOTE: normalizeは "修正して返すだけ" にして、ここでは保存しない（重くなる）
 // ============================================================
 function normalize() {
   const p = ensureProject();
@@ -120,12 +122,11 @@ function normalize() {
     p.labels.items = p.labels.items.map((it) => ({
       x: typeof it.x === "number" ? clamp01(it.x) : 0.06,
       y: typeof it.y === "number" ? clamp01(it.y) : 0.06,
-      color: it.color === "#000" || it.color === "black" ? "#000" : "#fff",
+      color: it?.color === "#000" || it?.color === "black" ? "#000" : "#fff",
     }));
   }
   if (typeof p.labels.enabled !== "boolean") p.labels.enabled = true;
 
-  saveProject(p);
   return p;
 }
 
@@ -134,6 +135,9 @@ function labelText(p, i) {
   return `#${i + 1}`;
 }
 
+// ============================================================
+// Image transform (cover * userScale)
+// ============================================================
 function applyTransform(img, ed) {
   const pane = img.parentElement;
   if (!pane) return;
@@ -161,70 +165,132 @@ function applyTransform(img, ed) {
   const ty = ed.y || 0;
   const rot = ed.rotate || 0;
 
-  // translate → rotate の順に固定（compose側と体感が揃う）
-  img.style.transform =
-    `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg)`;
+  // translate → rotate（compose側と体感揃え）
+  img.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg)`;
 }
 
-
 // ============================================================
-// Label badge style + drag (position per pane)
+// Label badge style + drag (枠内クランプ)
 // ============================================================
 function applyBadgeStyle(badge, pane, label) {
   const w = pane.clientWidth || 1;
   const h = pane.clientHeight || 1;
-  badge.style.left = `${Math.round(label.x * w)}px`;
-  badge.style.top = `${Math.round(label.y * h)}px`;
-  badge.style.color = label.color || "#fff";
+
+  // label無い/壊れてる時の保険
+  const x01 = clamp(Number(label?.x ?? 0.06), 0, 1);
+  const y01 = clamp(Number(label?.y ?? 0.06), 0, 1);
+
+  // 仮置き
+  badge.style.left = `${Math.round(x01 * w)}px`;
+  badge.style.top = `${Math.round(y01 * h)}px`;
+
+  // 枠内クランプ（バッジサイズ考慮）
+  const bw = badge.offsetWidth || 1;
+  const bh = badge.offsetHeight || 1;
+
+  const maxLeft = Math.max(0, w - bw);
+  const maxTop = Math.max(0, h - bh);
+
+  const leftPx = clamp(Math.round(x01 * w), 0, maxLeft);
+  const topPx = clamp(Math.round(y01 * h), 0, maxTop);
+
+  badge.style.left = `${leftPx}px`;
+  badge.style.top = `${topPx}px`;
+
+  badge.style.color = label?.color || "#fff";
   badge.style.pointerEvents = "auto";
   badge.style.touchAction = "none";
   badge.style.cursor = "grab";
 }
 
-function installBadgeDrag(badge, pane, i) {
-  let start = null;
+function installBadgeDrag(badge, pane, index) {
+  let startX = 0,
+    startY = 0;
+  let startX01 = 0,
+    startY01 = 0;
+  let dragging = false;
+
+  badge.style.touchAction = "none";
 
   badge.addEventListener("pointerdown", (e) => {
-    e.preventDefault?.();
+    if (e.pointerType === "touch" && !e.isPrimary) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragging = true;
     badge.setPointerCapture(e.pointerId);
 
     const p = normalize();
-    const label = p.labels.items[i];
+    p.labels = p.labels || {};
+    p.labels.items = p.labels.items || [{}, {}, {}, {}, {}, {}];
 
-    start = {
-      id: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      baseX: label.x,
-      baseY: label.y,
-      paneW: pane.clientWidth || 1,
-      paneH: pane.clientHeight || 1,
-    };
+    const it = p.labels.items[index] || {};
+    startX01 = typeof it.x === "number" ? it.x : 0.06;
+    startY01 = typeof it.y === "number" ? it.y : 0.06;
+
+    startX = e.clientX;
+    startY = e.clientY;
   });
 
   badge.addEventListener("pointermove", (e) => {
-    if (!start || start.id !== e.pointerId) return;
+    if (!dragging) return;
+    if (!badge.hasPointerCapture(e.pointerId)) return;
 
-    const dx = e.clientX - start.startX;
-    const dy = e.clientY - start.startY;
+    e.preventDefault();
 
     const p = normalize();
-    const label = p.labels.items[i];
+    p.labels = p.labels || {};
+    p.labels.items = p.labels.items || [{}, {}, {}, {}, {}, {}];
 
-    label.x = clamp01(start.baseX + dx / start.paneW);
-    label.y = clamp01(start.baseY + dy / start.paneH);
+    const prect = pane.getBoundingClientRect();
+    if (prect.width <= 1 || prect.height <= 1) return;
+
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    const bw = badge.offsetWidth || 1;
+    const bh = badge.offsetHeight || 1;
+
+    const maxLeftPx = Math.max(0, prect.width - bw);
+    const maxTopPx = Math.max(0, prect.height - bh);
+
+    const startLeftPx = startX01 * prect.width;
+    const startTopPx = startY01 * prect.height;
+
+    let leftPx = startLeftPx + dx;
+    let topPx = startTopPx + dy;
+
+    leftPx = clamp(leftPx, 0, maxLeftPx);
+    topPx = clamp(topPx, 0, maxTopPx);
+
+    const x01 = leftPx / prect.width;
+    const y01 = topPx / prect.height;
+
+    p.labels.items[index] = {
+      ...(p.labels.items[index] || {}),
+      x: x01,
+      y: y01,
+    };
 
     saveProject(p);
-    applyBadgeStyle(badge, pane, label);
+    applyBadgeStyle(badge, pane, p.labels.items[index]);
   });
 
-  function end(e) {
-    if (!start || start.id !== e.pointerId) return;
-    start = null;
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+
+    try {
+      if (badge.hasPointerCapture(e.pointerId)) badge.releasePointerCapture(e.pointerId);
+    } catch {}
   }
 
-  badge.addEventListener("pointerup", end);
-  badge.addEventListener("pointercancel", end);
+  badge.addEventListener("pointerup", endDrag);
+  badge.addEventListener("pointercancel", endDrag);
+  badge.addEventListener("lostpointercapture", () => {
+    dragging = false;
+  });
 }
 
 // ============================================================
@@ -263,6 +329,30 @@ function syncSlidersToActive() {
   if (rotateRange) rotateRange.value = String(ed.rotate ?? 0);
 }
 
+function syncLabelToggleUI() {
+  const p = normalize();
+  const on = p.labels?.enabled ?? true;
+  if (labelToggle) {
+    labelToggle.classList.toggle("is-on", on);
+    labelToggle.textContent = on ? "label:on" : "label:off";
+    labelToggle.setAttribute("aria-pressed", String(on));
+  }
+}
+
+// ✅ iOS安定：clickで切り替え
+labelToggle?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const p = normalize();
+  p.labels = p.labels || {};
+  p.labels.enabled = !(p.labels.enabled ?? true);
+
+  saveProject(p);
+  render();
+  syncLabelToggleUI();
+});
+
 // ============================================================
 // Render
 // ============================================================
@@ -280,7 +370,9 @@ async function render() {
 
   // icon update
   if (toggleLayoutBtn) {
-    toggleLayoutBtn.innerHTML = `<span class="icon ${p.layout === "split_lr" ? "split-lr" : "split-tb"}"></span>`;
+    toggleLayoutBtn.innerHTML = `<span class="icon ${
+      p.layout === "split_lr" ? "split-lr" : "split-tb"
+    }"></span>`;
   }
 
   split.innerHTML = "";
@@ -293,59 +385,63 @@ async function render() {
     pane.dataset.index = String(i);
 
     const img = document.createElement("img");
-    img.crossOrigin = "anonymous"; // ★canvas書き出し保険
+    img.crossOrigin = "anonymous"; // canvas書き出し保険
     img.alt = `img${i}`;
     pane.appendChild(img);
 
-// ★dataURL or storage path をどっちでも表示できる
-img.src = await resolveImageSrc(p.images[i], 60 * 10);
-
+    // dataURL or storage path のどちらでもOK
+    img.src = await resolveImageSrc(p.images[i], 60 * 10);
 
     // badge
     if (p.labels?.enabled) {
+      // labelsの保険
+      p.labels = p.labels || {};
+      p.labels.items = p.labels.items || [{}, {}];
+      p.labels.items[i] = p.labels.items[i] || { x: 0.06, y: 0.06, color: "#fff" };
+
       const badge = document.createElement("div");
       badge.className = "badge";
       badge.textContent = labelText(p, i);
       pane.appendChild(badge);
 
-      applyBadgeStyle(badge, pane, p.labels.items[i]);
+      // paneに付けてから位置補正（サイズ確定のため）
+      // いったん append 後に apply
+      // （下で split.appendChild(pane)するのでここではOK）
       installBadgeDrag(badge, pane, i);
     }
 
     split.appendChild(pane);
 
-    try { await img.decode?.(); } catch {}
+    // decode後にtransform/label位置を当てる
+    try {
+      await img.decode?.();
+    } catch {}
 
-    // pane / image size
-    const paneW = pane.clientWidth || 1;
-    const paneH = pane.clientHeight || 1;
-    const iw = img.naturalWidth || 1;
-    const ih = img.naturalHeight || 1;
-
-    // ✅ 保存用：編集時のpaneサイズ（x/y換算に必要）
+    // edits保険
     const ed = p.edits[i] || (p.edits[i] = { x: 0, y: 0, scale: 1, rotate: 0 });
 
-    ed.baseW = paneW;
-    ed.baseH = paneH;
-
-    // ✅ cover基準fit（ここが統一ポイント）
-    const baseCover = Math.max(paneW / iw, paneH / ih);
-
     if (!ed._fitInited) {
-    ed.scale = 1;
-    ed.rotate = 0;
-    ed.x = 0;
-    ed.y = 0;
-    ed._fitInited = true;
-    saveProject(p);
-  }
-  applyTransform(img, ed);
+      ed.scale = 1;
+      ed.rotate = 0;
+      ed.x = 0;
+      ed.y = 0;
+      ed._fitInited = true;
+      saveProject(p);
+    }
 
+    applyTransform(img, ed);
+
+    // badge位置反映（decode後のpaneサイズでクランプ）
+    if (p.labels?.enabled) {
+      const badge = pane.querySelector(".badge");
+      if (badge) applyBadgeStyle(badge, pane, p.labels.items[i]);
+    }
   }
 
   highlightActive();
   syncColorToggleUI();
   syncSlidersToActive();
+  syncLabelToggleUI();
 }
 
 // ============================================================
@@ -562,7 +658,6 @@ resetOneBtn?.addEventListener("click", () => {
   const p = normalize();
   if (!p.edits[activeIndex]) return;
 
-  // 現paneのbaseを残して、ユーザー調整だけ戻す
   const keep = p.edits[activeIndex];
   p.edits[activeIndex] = {
     ...keep,
@@ -583,11 +678,9 @@ resetOneBtn?.addEventListener("click", () => {
 // ============================================================
 async function saveBoth() {
   const p = normalize();
-  saveProject(p);
 
-  // ★保存用に、画像参照だけ「表示可能なURL」に解決したコピーを作る
+  // 保存用に参照だけURLへ解決したコピー
   const pForExport = { ...p, images: [...p.images] };
-
   const use = Math.min(2, pForExport.images.length);
   for (let i = 0; i < use; i++) {
     pForExport.images[i] = await resolveImageSrc(pForExport.images[i], 60 * 10);
@@ -610,7 +703,6 @@ async function saveBoth() {
   await saveToDevice(blob, `beforeafter_${Date.now()}.png`);
   window.location.href = "gallery.html";
 }
-
 
 saveBtn?.addEventListener("click", async () => {
   try {

@@ -179,7 +179,28 @@ export async function composePNG(p, options) {
           scale: raw.scale ?? 1, // ユーザー倍率そのまま
         };
 
-        coverDrawTransformed(ctx, imgs[idx], x, y, cellW, cellH, edit);
+        // ===== Editのpane比率に合わせてcellを再計算 =====
+        const bw2 = raw.baseW || cellW;
+        const bh2 = raw.baseH || cellH;
+        const paneAR = bw2 / bh2;
+
+        // cellW基準で高さ決定（Editと同じ比率）
+        let drawCellW = cellW;
+        let drawCellH = drawCellW / paneAR;
+
+        // 高さはみ出すなら高さ基準に切替
+        if (drawCellH > cellH) {
+          drawCellH = cellH;
+          drawCellW = drawCellH * paneAR;
+        }
+
+        // 中央寄せ
+        const cx = x + (cellW - drawCellW) / 2;
+        const cy = y + (cellH - drawCellH) / 2;
+
+        // ===== 描画 =====
+coverDrawTransformed(ctx, imgs[idx], cx, cy, drawCellW, drawCellH, edit);
+
         ctx.restore();
 
         idx++;

@@ -295,3 +295,25 @@
   outline: 2px solid rgba(255, 255, 255, 0.55);
   outline-offset: 3px;
 }
+
+.label-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+#labelToggle {
+  flex: 0 0 auto;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  position: relative;
+  z-index: 60;
+  pointer-events: auto;
+  touch-action: manipulation;
+  appearance: none;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text);
+}

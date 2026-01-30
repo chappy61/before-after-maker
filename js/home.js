@@ -1,6 +1,12 @@
+import { requireAuthOrRedirect } from "./passcodeAuth.js";
+import { supabase } from "./supabaseClient.js";
 import { ensureProject, saveProject } from "./storage.js";
 import { uploadToGallery } from "./storage.js";
-import { supabase } from "./supabaseClient.js";
+
+(async () => {
+  // スマホが未ログインならログインへ飛ばす
+  await requireAuthOrRedirect("./k9x3.html");
+})();
 
 // 任意：画面に表示するステータス要素があるなら使う
 const statusEl = document.getElementById("statusText");
@@ -91,11 +97,12 @@ async function ingestFiles(fileList){
     setStatus("");
     window.location.href = "edit.html";
 
-  } catch (e){
+    } catch (e) {
     console.error(e);
-    setStatus("アップロードに失敗しました。通信環境を確認してもう一度試してください。");
-    // 失敗時は中途半端な状態を残さない方が安定（必要ならここでp.imagesを空にしてsaveも可）
+    alert(`アップロード/遷移に失敗: ${e?.message || e}`);
+    setStatus?.(`失敗: ${e?.message || e}`);
   }
+
 }
 newBtn?.addEventListener("click", async () => {
   // どっちを開くか：PC/iPadはピッカー、スマホはカメラ優先にしたいなら分岐
