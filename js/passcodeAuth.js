@@ -68,6 +68,14 @@ export async function requireAuthOrRedirect(loginPath = "./k9x3.html") {
   return session;
 }
 
+export async function mustUser() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!user) throw new Error("Not signed in");
+  return user;
+}
+
+
 export async function logout() {
   await supabase.auth.signOut();
 }

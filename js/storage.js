@@ -1,5 +1,13 @@
+// storage.js
+import { supabase } from "./supabaseClient.js";
+
+// ====== Local cache (small metadata only) ======
 export const STORAGE_KEY = "ba_project_v1";
 
+// ====== Supabase Storage ======
+const BUCKET = "gallery";
+
+// ---------- localStorage ----------
 export function loadProject() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -10,7 +18,14 @@ export function loadProject() {
 }
 
 export function saveProject(p) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  try {
+    // ⚠️ 画像(dataURL)を入れるとここが爆発するので、
+    // できるだけ p.images には "storage path" を入れる運用に寄せる
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  } catch (e) {
+    // 容量いっぱいでもアプリを落とさない（クラウドが正になるため）
+    console.warn("localStorage full, skip cache:", e?.name);
+  }
 }
 
 export function ensureProject() {
@@ -36,7 +51,7 @@ export function ensureProject() {
       existing.labels.items.push({
         x: i === 0 ? 0.06 : 0.56,
         y: 0.08,
-        color: "#fff", // "#fff" or "#000"
+        color: "#fff",
       });
     }
     existing.labels.items = existing.labels.items.slice(0, use);
@@ -54,10 +69,11 @@ export function ensureProject() {
   // --- new project ---
   const fresh = {
     version: 1,
+    projectId: null, // ← storageのフォルダ名に使うならここ
     count: null,
     layout: "split_lr",
     theme: null,
-    images: [],
+    images: [],       // dataURL OR storage path
     edits: [],
     labels: { enabled: true, items: [] },
     title: "施術前後写真",
@@ -66,3 +82,95 @@ export function ensureProject() {
   saveProject(fresh);
   return fresh;
 }
+
+// ---------- helpers ----------
+export function isDataUrl(s) {
+  return typeof s === "string" && s.startsWith("data:");
+}
+
+// "foo.jpg" -> "jpg"
+export function extFromName(name, fallback = "jpg") {
+  if (!name) return fallback;
+  const p = String(name).split(".").pop();
+  return (p && p.length <= 5 ? p : fallback).toLowerCase();
+}
+
+// ---------- Supabase Storage: upload / signed url / remove ----------
+export async function requireUser() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!data?.user) throw new Error("Not signed in");
+  return data.user;
+}
+
+/**
+ * Upload one image (File/Blob) to Supabase Storage.
+ * Returns storage path like: `${userId}/${projectId}/${uuid}.jpg`
+ */
+export async function uploadImageToGallery({ fileOrBlob, projectId, ext = "jpg" }) {
+  const user = await requireUser();
+  const uid = user.id;
+
+  const safeProjectId = projectId || crypto.randomUUID();
+  const fileName = `${crypto.randomUUID()}.${ext}`;
+  const path = `${uid}/${safeProjectId}/${fileName}`;
+
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, fileOrBlob, {
+      upsert: false,
+      contentType: fileOrBlob.type || "image/jpeg",
+      cacheControl: "3600",
+    });
+
+  if (error) throw error;
+  return { path, projectId: safeProjectId, userId: uid };
+}
+// home.js 用の薄いラッパー（互換用）
+export async function uploadToGallery(path, fileOrBlob) {
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, fileOrBlob, {
+      upsert: false,
+      contentType: fileOrBlob.type || "image/jpeg",
+      cacheControl: "3600",
+    });
+
+  if (error) throw error;
+  return path;
+}
+
+/**
+ * Create signed URL for private bucket.
+ */
+export async function getSignedUrl(path, expiresSec = 600) {
+  // すでにURLなら、そのまま返す（2重署名を防ぐ）
+  if (typeof path === "string" && /^https?:\/\//i.test(path)) return path;
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, expiresSec);
+
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+/**
+ * Delete images by paths.
+ */
+export async function deleteGalleryPaths(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(paths);
+  if (error) throw error;
+}
+
+/**
+ * Resolve image reference to usable URL for <img src>.
+ * - dataURL => return as is
+ * - storage path => signed url
+ */
+export async function resolveImageSrc(imgRef, expiresInSec = 60 * 10) {
+  if (isDataUrl(imgRef)) return imgRef;
+  return await getSignedUrl(imgRef, expiresInSec);
+}
+

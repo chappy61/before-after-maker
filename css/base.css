@@ -192,3 +192,14 @@ p {
   gap: 10px;
   padding: 14px 16px 16px;
 }
+/* 下だけ色が違うのを止める（iPhone対策） */
+.yearbar {
+  background: var(--bg); /* ← 透明やmixをやめて固定 */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* yearbarの上に線があるなら一体化 */
+.yearbar {
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}

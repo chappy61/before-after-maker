@@ -1,16 +1,17 @@
-// js/edit.js (cleaned + commented)
+// js/edit.js (cover unified, cleaned + commented)
 // ------------------------------------------------------------
-// Features
-// - Split view (LR/TB) toggle
+// - Split view (LR/TB)
 // - Active pane selection
 // - Drag / pinch zoom / rotate (pointer events)
-// - Label overlay per pane: position (drag), color (W/B toggle)
-// - Save: export PNG and share/download
+// - Label overlay per pane (position drag), color toggle (W/B)
+// - Save: export PNG + save to gallery + share/download
 // ------------------------------------------------------------
-import { addToGallery } from "./db.js";
 
+import { addToGallery } from "./db.js";
 import { ensureProject, saveProject } from "./storage.js";
 import { composePNG } from "./compose.js";
+import { requireAuthOrRedirect } from "./passcodeAuth.js";
+import { resolveImageSrc } from "./storage.js";
 
 // ============================================================
 // DOM
@@ -18,19 +19,14 @@ import { composePNG } from "./compose.js";
 const split = document.getElementById("split");
 const toggleLayoutBtn = document.getElementById("toggleLayoutBtn");
 const backBtn = document.getElementById("backBtn");
-const nextBtn = document.getElementById("nextBtn");
 const resetBtn = document.getElementById("resetBtn");
 
-// sliders
 const scaleRange = document.getElementById("scaleRange");
 const rotateRange = document.getElementById("rotateRange");
 
-// label UI (stylish toggle)
-const colorToggle = document.getElementById("colorToggle"); // ← お洒落トグル
-// Save button
+const colorToggle = document.getElementById("colorToggle");
 const saveBtn = document.getElementById("saveBtn");
 
-// optional
 const resetOneBtn = document.getElementById("resetOneBtn");
 const targetBar = document.getElementById("targetBar");
 
@@ -107,11 +103,11 @@ function normalize() {
   if (!Array.isArray(p.edits)) p.edits = [];
   if (!p.layout) p.layout = "split_lr";
 
-  // ----- edits length align -----
+  // edits length align
   while (p.edits.length < p.images.length) p.edits.push({ x: 0, y: 0, scale: 1, rotate: 0 });
   p.edits = p.edits.slice(0, p.images.length);
 
-  // ----- labels -----
+  // labels
   if (!p.labels) p.labels = {};
   if (!Array.isArray(p.labels.items)) {
     p.labels.items = [
@@ -121,15 +117,12 @@ function normalize() {
   } else {
     while (p.labels.items.length < 2) p.labels.items.push({ x: 0.06, y: 0.06, color: "#fff" });
     p.labels.items = p.labels.items.slice(0, 2);
-
     p.labels.items = p.labels.items.map((it) => ({
       x: typeof it.x === "number" ? clamp01(it.x) : 0.06,
       y: typeof it.y === "number" ? clamp01(it.y) : 0.06,
       color: it.color === "#000" || it.color === "black" ? "#000" : "#fff",
     }));
   }
-
-  // enabled flag (使わないなら常にtrueでもOK)
   if (typeof p.labels.enabled !== "boolean") p.labels.enabled = true;
 
   saveProject(p);
@@ -142,9 +135,37 @@ function labelText(p, i) {
 }
 
 function applyTransform(img, ed) {
+  const pane = img.parentElement;
+  if (!pane) return;
+
+  const paneW = pane.clientWidth || 1;
+  const paneH = pane.clientHeight || 1;
+
+  const iw = img.naturalWidth || 1;
+  const ih = img.naturalHeight || 1;
+
+  // cover倍率
+  const baseCover = Math.max(paneW / iw, paneH / ih);
+
+  // ユーザー倍率（1=初期）
+  const userScale = typeof ed.scale === "number" ? ed.scale : 1;
+
+  // cover*ユーザー倍率で実サイズ
+  const drawW = iw * baseCover * userScale;
+  const drawH = ih * baseCover * userScale;
+
+  img.style.width = `${drawW}px`;
+  img.style.height = `${drawH}px`;
+
+  const tx = ed.x || 0;
+  const ty = ed.y || 0;
+  const rot = ed.rotate || 0;
+
+  // translate → rotate の順に固定（compose側と体感が揃う）
   img.style.transform =
-    `translate(-50%, -50%) translate(${ed.x}px, ${ed.y}px) rotate(${ed.rotate}deg) scale(${ed.scale})`;
+    `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg)`;
 }
+
 
 // ============================================================
 // Label badge style + drag (position per pane)
@@ -155,7 +176,6 @@ function applyBadgeStyle(badge, pane, label) {
   badge.style.left = `${Math.round(label.x * w)}px`;
   badge.style.top = `${Math.round(label.y * h)}px`;
   badge.style.color = label.color || "#fff";
-
   badge.style.pointerEvents = "auto";
   badge.style.touchAction = "none";
   badge.style.cursor = "grab";
@@ -170,6 +190,7 @@ function installBadgeDrag(badge, pane, i) {
 
     const p = normalize();
     const label = p.labels.items[i];
+
     start = {
       id: e.pointerId,
       startX: e.clientX,
@@ -220,7 +241,7 @@ function highlightActive() {
 }
 
 // ============================================================
-// Sync UI (toggle state)
+// Sync UI
 // ============================================================
 function getCurrentLabelColor(p) {
   const c = p.labels?.items?.[0]?.color;
@@ -232,6 +253,14 @@ function syncColorToggleUI() {
   const p = normalize();
   const c = getCurrentLabelColor(p);
   colorToggle.classList.toggle("black", c === "#000");
+}
+
+function syncSlidersToActive() {
+  const p = normalize();
+  const ed = p.edits?.[activeIndex];
+  if (!ed) return;
+  if (scaleRange) scaleRange.value = String(ed.scale ?? 1);
+  if (rotateRange) rotateRange.value = String(ed.rotate ?? 0);
 }
 
 // ============================================================
@@ -264,11 +293,15 @@ async function render() {
     pane.dataset.index = String(i);
 
     const img = document.createElement("img");
-    img.src = p.images[i];
+    img.crossOrigin = "anonymous"; // ★canvas書き出し保険
     img.alt = `img${i}`;
     pane.appendChild(img);
 
-    // badge (always enabled in your plan)
+// ★dataURL or storage path をどっちでも表示できる
+img.src = await resolveImageSrc(p.images[i], 60 * 10);
+
+
+    // badge
     if (p.labels?.enabled) {
       const badge = document.createElement("div");
       badge.className = "badge";
@@ -281,29 +314,38 @@ async function render() {
 
     split.appendChild(pane);
 
-    // decode optional
     try { await img.decode?.(); } catch {}
 
-    // first fit init (contain)
+    // pane / image size
     const paneW = pane.clientWidth || 1;
     const paneH = pane.clientHeight || 1;
     const iw = img.naturalWidth || 1;
     const ih = img.naturalHeight || 1;
 
-    const fit = Math.min(paneW / iw, paneH / ih);
-    const ed = p.edits[i];
+    // ✅ 保存用：編集時のpaneサイズ（x/y換算に必要）
+    const ed = p.edits[i] || (p.edits[i] = { x: 0, y: 0, scale: 1, rotate: 0 });
 
-    if (ed && !ed._fitInited) {
-      ed.scale = Math.max(0.05, Math.min(1, fit));
-      ed._fitInited = true;
-      saveProject(p);
-    }
+    ed.baseW = paneW;
+    ed.baseH = paneH;
 
-    applyTransform(img, p.edits[i]);
+    // ✅ cover基準fit（ここが統一ポイント）
+    const baseCover = Math.max(paneW / iw, paneH / ih);
+
+    if (!ed._fitInited) {
+    ed.scale = 1;
+    ed.rotate = 0;
+    ed.x = 0;
+    ed.y = 0;
+    ed._fitInited = true;
+    saveProject(p);
+  }
+  applyTransform(img, ed);
+
   }
 
   highlightActive();
   syncColorToggleUI();
+  syncSlidersToActive();
 }
 
 // ============================================================
@@ -324,6 +366,7 @@ split?.addEventListener("click", (e) => {
   if (!pane) return;
   activeIndex = Number(pane.dataset.index);
   highlightActive();
+  syncSlidersToActive();
 });
 
 // ============================================================
@@ -334,6 +377,7 @@ targetBar?.addEventListener("click", (e) => {
   if (!btn) return;
   activeIndex = Number(btn.dataset.target);
   highlightActive();
+  syncSlidersToActive();
 });
 
 // ============================================================
@@ -351,16 +395,18 @@ toggleLayoutBtn?.addEventListener("click", () => {
 // ============================================================
 scaleRange?.addEventListener("input", () => {
   const p = normalize();
-  if (!p.edits[activeIndex]) return;
-  p.edits[activeIndex].scale = Number(scaleRange.value);
+  const ed = p.edits[activeIndex];
+  if (!ed) return;
+  ed.scale = Number(scaleRange.value);
   saveProject(p);
   updateOne(activeIndex);
 });
 
 rotateRange?.addEventListener("input", () => {
   const p = normalize();
-  if (!p.edits[activeIndex]) return;
-  p.edits[activeIndex].rotate = Number(rotateRange.value);
+  const ed = p.edits[activeIndex];
+  if (!ed) return;
+  ed.rotate = Number(rotateRange.value);
   saveProject(p);
   updateOne(activeIndex);
 });
@@ -372,19 +418,20 @@ split?.addEventListener("pointerdown", (e) => {
   const pane = e.target.closest?.(".pane");
   if (!pane) return;
 
-  // If badge is touched, badge drag handles it
+  // badge drag handles it
   if (e.target.closest?.(".badge")) return;
 
   activeIndex = Number(pane.dataset.index);
   highlightActive();
+  syncSlidersToActive();
 
   const p = normalize();
   const ed = p.edits[activeIndex];
   if (!ed) return;
 
   e.preventDefault?.();
-
   pane.setPointerCapture(e.pointerId);
+
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
   if (pointers.size === 1) {
@@ -392,8 +439,8 @@ split?.addEventListener("pointerdown", (e) => {
       type: "drag",
       startX: e.clientX,
       startY: e.clientY,
-      baseX: ed.x,
-      baseY: ed.y,
+      baseX: ed.x || 0,
+      baseY: ed.y || 0,
     };
     return;
   }
@@ -408,10 +455,10 @@ split?.addEventListener("pointerdown", (e) => {
       startDist: dist(a, b),
       startAng: angle(a, b),
       startCenter: center(a, b),
-      baseScale: ed.scale,
-      baseRotate: ed.rotate,
-      baseX: ed.x,
-      baseY: ed.y,
+      baseScale: ed.scale ?? 1,
+      baseRotate: ed.rotate ?? 0,
+      baseX: ed.x || 0,
+      baseY: ed.y || 0,
     };
   }
 });
@@ -449,23 +496,22 @@ split?.addEventListener("pointermove", (e) => {
     const curCenter = center(a, b);
 
     const ratio = gesture.startDist ? curDist / gesture.startDist : 1;
-    const nextScale = clamp(gesture.baseScale * ratio, 0.4, 3.0);
+    const nextScale = clamp((gesture.baseScale || 1) * ratio, 0.4, 3.0);
 
     const dAng = curAng - gesture.startAng;
-    const nextRotate = gesture.baseRotate + (dAng * 180) / Math.PI;
+    const nextRotate = (gesture.baseRotate || 0) + (dAng * 180) / Math.PI;
 
     const dcx = curCenter.x - gesture.startCenter.x;
     const dcy = curCenter.y - gesture.startCenter.y;
 
     ed.scale = Math.round(nextScale * 1000) / 1000;
     ed.rotate = Math.round(nextRotate * 10) / 10;
-    ed.x = Math.round(gesture.baseX + dcx);
-    ed.y = Math.round(gesture.baseY + dcy);
+    ed.x = Math.round((gesture.baseX || 0) + dcx);
+    ed.y = Math.round((gesture.baseY || 0) + dcy);
 
     saveProject(p);
     updateOne(activeIndex);
 
-    // sliders follow (optional)
     if (scaleRange) scaleRange.value = String(ed.scale);
     if (rotateRange) rotateRange.value = String(ed.rotate);
   }
@@ -489,13 +535,11 @@ colorToggle?.addEventListener("click", () => {
   const cur = getCurrentLabelColor(p);
   const next = cur === "#fff" ? "#000" : "#fff";
 
-  // 2枚分まとめて更新（共通カラー）
   p.labels.items[0].color = next;
   p.labels.items[1].color = next;
 
   saveProject(p);
 
-  // 画面上のbadgeも即反映
   split.querySelectorAll(".pane").forEach((pane) => {
     const badge = pane.querySelector(".badge");
     if (badge) badge.style.color = next;
@@ -517,9 +561,21 @@ resetBtn?.addEventListener("click", () => {
 resetOneBtn?.addEventListener("click", () => {
   const p = normalize();
   if (!p.edits[activeIndex]) return;
-  p.edits[activeIndex] = { x: 0, y: 0, scale: 1, rotate: 0, _fitInited: true };
+
+  // 現paneのbaseを残して、ユーザー調整だけ戻す
+  const keep = p.edits[activeIndex];
+  p.edits[activeIndex] = {
+    ...keep,
+    x: 0,
+    y: 0,
+    scale: 1,
+    rotate: 0,
+    _fitInited: true,
+  };
+
   saveProject(p);
   updateOne(activeIndex);
+  syncSlidersToActive();
 });
 
 // ============================================================
@@ -529,13 +585,21 @@ async function saveBoth() {
   const p = normalize();
   saveProject(p);
 
-  const dataUrl = await composePNG(p, { labels: p.labels });
+  // ★保存用に、画像参照だけ「表示可能なURL」に解決したコピーを作る
+  const pForExport = { ...p, images: [...p.images] };
+
+  const use = Math.min(2, pForExport.images.length);
+  for (let i = 0; i < use; i++) {
+    pForExport.images[i] = await resolveImageSrc(pForExport.images[i], 60 * 10);
+  }
+
+  const dataUrl = await composePNG(pForExport, { labels: pForExport.labels });
   const blob = dataURLToBlob(dataUrl);
 
-  // ✅ アプリ内保存（Supabase同期）
   await addToGallery({
     fullBlob: blob,
     meta: {
+      projectId: p.projectId,
       ratio: p.ratio || "4:5",
       layout: p.layout || "split_lr",
       title: p.title || "",
@@ -543,10 +607,7 @@ async function saveBoth() {
     },
   });
 
-  // ✅ 端末にも保存したいなら残す（ON/OFFはあとでUI化できる）
   await saveToDevice(blob, `beforeafter_${Date.now()}.png`);
-
-  // ✅ 保存後 gallery へ
   window.location.href = "gallery.html";
 }
 
@@ -554,17 +615,11 @@ async function saveBoth() {
 saveBtn?.addEventListener("click", async () => {
   try {
     await saveBoth();
- } catch (err) {
-  console.error("SAVE ERROR:", err);
-  console.error("status:", err?.status);
-  console.error("message:", err?.message);
-  console.error("details:", err?.details);
-  console.error("hint:", err?.hint);
-  alert(`保存に失敗しました\n${err?.message || err}`);
-}
-
+  } catch (err) {
+    console.error("SAVE ERROR:", err);
+    alert(`保存に失敗しました\n${err?.message || err}`);
+  }
 });
-
 
 // ============================================================
 // Nav
@@ -573,12 +628,10 @@ backBtn?.addEventListener("click", () => {
   window.location.href = "index.html";
 });
 
-import { requireAuthOrRedirect } from "./passcodeAuth.js";
-
 // ============================================================
 // Init
 // ============================================================
 (async () => {
-  await requireAuthOrRedirect("./k9x3.html"); // 未ログインはここで弾く
-  render();
+  await requireAuthOrRedirect("./k9x3.html");
+  await render();
 })();

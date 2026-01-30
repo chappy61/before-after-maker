@@ -1,97 +1,44 @@
-// js/db.js (Supabase版)
-// gallery bucket + gallery table を使う
+// js/db.js
+// ------------------------------------------------------------
+// Gallery DB + Storage helpers (Supabase)
+// - private bucket + signed URL for display
+// - addToGallery uploads full + thumb and inserts DB row
+// ------------------------------------------------------------
+
 import { supabase } from "./supabaseClient.js";
+import { requireAuthOrRedirect } from "./passcodeAuth.js"; // ←あなたの実体に合わせる
 
-const BUCKET = "gallery";
-
-// 軽いサムネ生成（十分ならこのまま）
-// もっと綺麗にしたいなら後でCanvasで縮小に変えよう
-async function blobToThumb(blob, max = 360, quality = 0.86) {
-  const img = new Image();
-  const url = URL.createObjectURL(blob);
-  img.src = url;
-  await img.decode();
-  URL.revokeObjectURL(url);
-
-  const w = img.naturalWidth || 1;
-  const h = img.naturalHeight || 1;
-  const s = Math.min(1, max / Math.max(w, h));
-  const tw = Math.max(1, Math.round(w * s));
-  const th = Math.max(1, Math.round(h * s));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = tw;
-  canvas.height = th;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, tw, th);
-
-  const out = await new Promise((resolve) =>
-    canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
-  );
-  return out || blob; // 失敗時は原寸
-}
+const BUCKET = "gallery"; // Storage bucket name
+const TABLE = "gallery";  // DB table name
 
 async function mustUser() {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-  if (!data?.user) throw new Error("未ログインです");
-  return data.user;
+  // passcodeAuth.js の requireAuthOrRedirect() が session を返す想定
+  const session = await requireAuthOrRedirect();
+  const user = session?.user;
+  if (!user) throw new Error("Not authenticated");
+  return user;
 }
 
-function extFromBlob(blob, fallback = "png") {
-  const t = (blob?.type || "").toLowerCase();
-  if (t.includes("jpeg") || t.includes("jpg")) return "jpg";
-  if (t.includes("webp")) return "webp";
-  if (t.includes("png")) return "png";
-  return fallback;
-}
+async function blobToThumb(blob, maxSide = 640, quality = 0.86) {
+  // 画像を読み込み
+  const bmp = await createImageBitmap(blob);
 
-export async function addToGallery({ fullBlob, thumbBlob, meta }) {
-  const user = await mustUser();
+  const w = bmp.width;
+  const h = bmp.height;
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const tw = Math.max(1, Math.round(w * scale));
+  const th = Math.max(1, Math.round(h * scale));
 
-  const id = crypto.randomUUID();
-  const folder = `${user.id}/${id}`;
+  const c = document.createElement("canvas");
+  c.width = tw;
+  c.height = th;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(bmp, 0, 0, tw, th);
 
-  const fullExt = extFromBlob(fullBlob, "png");
-  const fullPath = `${folder}/full.${fullExt}`;
-
-  // thumb が来てなければ自動生成
-  const tb = thumbBlob || (await blobToThumb(fullBlob));
-  const thumbExt = extFromBlob(tb, "jpg");
-  const thumbPath = `${folder}/thumb.${thumbExt}`;
-
-  // 1) upload (private bucket)
-  {
-    const { error } = await supabase.storage.from(BUCKET).upload(fullPath, fullBlob, {
-      upsert: false,
-      contentType: fullBlob.type || "image/png",
-    });
-    if (error) throw error;
-  }
-
-  {
-    const { error } = await supabase.storage.from(BUCKET).upload(thumbPath, tb, {
-      upsert: false,
-      contentType: tb.type || "image/jpeg",
-    });
-    if (error) throw error;
-  }
-
-  // 2) insert row
-  const row = {
-    id,
-    user_id: user.id,
-    full_path: fullPath,
-    thumb_path: thumbPath,
-    meta: meta || {},
-  };
-
-  {
-    const { error } = await supabase.from("gallery").insert(row);
-    if (error) throw error;
-  }
-
-  return { ...row, created_at: new Date().toISOString() };
+  // JPEGで軽く
+  const out = await new Promise((resolve) => c.toBlob(resolve, "image/jpeg", quality));
+  if (!out) throw new Error("thumb encode failed");
+  return out;
 }
 
 async function signedUrl(path, expiresSec = 60 * 10) {
@@ -100,18 +47,72 @@ async function signedUrl(path, expiresSec = 60 * 10) {
   return data.signedUrl;
 }
 
+export async function addToGallery({ fullBlob, thumbBlob, meta }) {
+  const user = await mustUser();
+
+  // 保存セットID（DBのidにも使う）
+  const id = crypto.randomUUID();
+
+  // meta.projectId があれば同一案件配下にまとめる
+  const projectId = meta?.projectId || crypto.randomUUID();
+  const folder = `${user.id}/${projectId}/export/${id}`;
+
+  const fullPath = `${folder}/full.png`;
+
+  // thumb が来てなければ自動生成
+  const tb = thumbBlob || (await blobToThumb(fullBlob));
+  const thumbPath = `${folder}/thumb.jpg`;
+
+  console.log("[UPLOAD]", { BUCKET, fullPath, thumbPath, userId: user.id });
+
+  // 1) upload (bucket)
+  {
+    const { error } = await supabase.storage.from(BUCKET).upload(fullPath, fullBlob, {
+      upsert: false,
+      contentType: "image/png",
+      cacheControl: "3600",
+    });
+    if (error) throw error;
+  }
+
+  {
+    const { error } = await supabase.storage.from(BUCKET).upload(thumbPath, tb, {
+      upsert: false,
+      contentType: "image/jpeg",
+      cacheControl: "3600",
+    });
+    if (error) throw error;
+  }
+
+  // 2) insert row (table)
+  const row = {
+    id,
+    user_id: user.id,
+    full_path: fullPath,
+    thumb_path: thumbPath,
+    meta: { ...(meta || {}), projectId },
+  };
+
+  {
+    const { error } = await supabase.from(TABLE).insert(row);
+    if (error) throw error;
+  }
+
+  return { ...row, created_at: new Date().toISOString() };
+}
+
 export async function listGallery(limit = 30) {
   await mustUser();
 
   const { data, error } = await supabase
-    .from("gallery")
+    .from(TABLE)
     .select("id, created_at, thumb_path, full_path, meta")
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) throw error;
 
-  // signed URL を付与（表示用）
+  // 表示用：thumb を signed URL 化
   const out = await Promise.all(
     (data || []).map(async (it) => {
       const thumbUrl = await signedUrl(it.thumb_path || it.full_path);
@@ -126,7 +127,7 @@ export async function getGalleryItem(id) {
   await mustUser();
 
   const { data, error } = await supabase
-    .from("gallery")
+    .from(TABLE)
     .select("id, created_at, thumb_path, full_path, meta")
     .eq("id", id)
     .maybeSingle();
@@ -154,15 +155,14 @@ export async function deleteGalleryItem(id) {
     if (error) throw error;
   }
 
-  // db delete（RLSで自分の分だけ消せる）
+  // db delete（RLSで自分の分だけ消せる想定）
   {
-    const { error } = await supabase.from("gallery").delete().eq("id", id);
+    const { error } = await supabase.from(TABLE).delete().eq("id", id);
     if (error) throw error;
   }
 }
 
 export async function clearGallery() {
-  // 危険操作なのでまず一覧取ってから消す（自分の分だけ）
   const items = await listGallery(500);
   for (const it of items) {
     await deleteGalleryItem(it.id);
