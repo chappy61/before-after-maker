@@ -111,29 +111,128 @@ function normalize() {
 
   // labels
   if (!p.labels) p.labels = {};
-  if (!Array.isArray(p.labels.items)) {
-    p.labels.items = [
-      { x: 0.06, y: 0.06, color: "#fff" },
-      { x: 0.06, y: 0.06, color: "#fff" },
-    ];
-  } else {
-    while (p.labels.items.length < 2) p.labels.items.push({ x: 0.06, y: 0.06, color: "#fff" });
-    p.labels.items = p.labels.items.slice(0, 2);
-    p.labels.items = p.labels.items.map((it) => ({
-      x: typeof it.x === "number" ? clamp01(it.x) : 0.06,
-      y: typeof it.y === "number" ? clamp01(it.y) : 0.06,
-      color: it?.color === "#000" || it?.color === "black" ? "#000" : "#fff",
-    }));
-  }
   if (typeof p.labels.enabled !== "boolean") p.labels.enabled = true;
+  if (!Array.isArray(p.labels.items)) p.labels.items = [];
+
+  const n = Math.min(p.images.length || 0, 6);
+
+  while (p.labels.items.length < n) {
+    p.labels.items.push({ x: 0.06, y: 0.06, color: "#fff" });
+  }
+  p.labels.items = p.labels.items.slice(0, n);
+
+  p.labels.items = p.labels.items.map((it) => ({
+    x: typeof it.x === "number" ? clamp01(it.x) : 0.06,
+    y: typeof it.y === "number" ? clamp01(it.y) : 0.06,
+    color: it?.color === "#000" || it?.color === "black" ? "#000" : "#fff",
+  }));
 
   return p;
 }
 
 function labelText(p, i) {
+  const t = p.labels?.items?.[i]?.text;
+  if (typeof t === "string" && t.trim() !== "") return t.trim();
+
   if (p.images.length === 2) return i === 0 ? "before" : "after";
   return `#${i + 1}`;
 }
+
+function layoutForCount(n){
+  if (n <= 2) return { cols: 2, rows: 1, cells: 2 };
+  if (n === 3) return { cols: 3, rows: 1, cells: 3 };
+  if (n === 4) return { cols: 2, rows: 2, cells: 4 };
+  return { cols: 3, rows: 2, cells: 6 };
+}
+
+function ensureLayoutObject(p){
+  // p.layout が文字列なら count から決定
+  if (!p.layout || typeof p.layout === "string") {
+    const n = Math.min(p.images.length, 6);
+    p.layout = layoutForCount(n);
+  }
+  return p.layout;
+}
+async function renderGrid(p) {
+  const splitEl = document.getElementById("split");
+  if (!splitEl) return;
+
+  const n = Math.min(p.images.length, 6);
+  const layout = ensureLayoutObject(p);
+
+  // split_lr / split_tb の世界線を抜ける
+  splitEl.className = "split grid";
+  splitEl.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
+  splitEl.style.gridTemplateRows = `repeat(${layout.rows}, 1fr)`;
+
+  splitEl.innerHTML = "";
+
+  const cells = layout.cols * layout.rows;
+
+  for (let i = 0; i < cells; i++) {
+    const pane = document.createElement("div");
+    pane.className = "pane";
+    pane.dataset.index = String(i);
+
+    if (i >= n) {
+      pane.classList.add("empty");
+      splitEl.appendChild(pane);
+      continue;
+    }
+
+    // img
+    const img = document.createElement("img");
+    img.className = "pane-img";
+    img.crossOrigin = "anonymous";
+    img.alt = `img${i + 1}`;
+    pane.appendChild(img);
+
+    // src resolve (dataURL / storage path OK)
+    img.src = await resolveImageSrc(p.images[i], 60 * 10);
+
+    // badge
+    if (p.labels?.enabled) {
+      p.labels = p.labels || {};
+      p.labels.items = p.labels.items || [];
+      p.labels.items[i] = p.labels.items[i] || { x: 0.06, y: 0.06, color: "#fff" };
+
+      const badge = document.createElement("div");
+      badge.className = "badge";
+      badge.textContent = labelText(p, i);
+      pane.appendChild(badge);
+
+      installBadgeDrag(badge, pane, i);
+    }
+
+    splitEl.appendChild(pane);
+
+    // decode after append
+    try {
+      await img.decode?.();
+    } catch {}
+
+    // edits保険 + 初回fit
+    const ed = p.edits[i] || (p.edits[i] = { x: 0, y: 0, scale: 1, rotate: 0 });
+
+    if (!ed._fitInited) {
+      ed.scale = 1;
+      ed.rotate = 0;
+      ed.x = 0;
+      ed.y = 0;
+      ed._fitInited = true;
+      saveProject(p);
+    }
+
+    applyTransform(img, ed);
+
+    // badge位置反映
+    if (p.labels?.enabled) {
+      const badge = pane.querySelector(".badge");
+      if (badge) applyBadgeStyle(badge, pane, p.labels.items[i]);
+    }
+  }
+}
+
 
 // ============================================================
 // Image transform (cover * userScale)
@@ -144,6 +243,9 @@ function applyTransform(img, ed) {
 
   const paneW = pane.clientWidth || 1;
   const paneH = pane.clientHeight || 1;
+
+  ed.baseW = paneW;
+  ed.baseH = paneH;
 
   const iw = img.naturalWidth || 1;
   const ih = img.naturalHeight || 1;
@@ -201,6 +303,50 @@ function applyBadgeStyle(badge, pane, label) {
   badge.style.pointerEvents = "auto";
   badge.style.touchAction = "none";
   badge.style.cursor = "grab";
+}
+
+function installBadgeTextEdit(badge, index) {
+  // PC: dblclick
+  badge.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openLabelEditor(index);
+  });
+
+  // Mobile: double tap
+  let lastTap = 0;
+  badge.addEventListener("click", (e) => {
+    // dragのpointerdownと干渉しないよう、click側で判定
+    const now = Date.now();
+    const dt = now - lastTap;
+    lastTap = now;
+
+    if (dt < 320) {
+      e.preventDefault();
+      e.stopPropagation();
+      openLabelEditor(index);
+    }
+  });
+}
+
+function openLabelEditor(index) {
+  const p = normalize();
+  p.labels = p.labels || {};
+  p.labels.items = p.labels.items || [];
+  p.labels.items[index] = p.labels.items[index] || { x: 0.06, y: 0.06, color: "#fff" };
+
+  const current = p.labels.items[index].text || "";
+  const next = prompt(`ラベル文字を入力（空でリセット）`, current);
+
+  // キャンセル
+  if (next === null) return;
+
+  const v = String(next).trim();
+  if (v === "") delete p.labels.items[index].text;
+  else p.labels.items[index].text = v;
+
+  saveProject(p);
+  render(); // バッジ文字も更新
 }
 
 function installBadgeDrag(badge, pane, index) {
@@ -365,6 +511,34 @@ async function render() {
     return;
   }
 
+  // 3枚以上はグリッドへ
+  if (n > 2) {
+    await renderGrid(p);
+
+    // layoutボタンはグリッド中は無効（事故防止）
+    if (toggleLayoutBtn) {
+      toggleLayoutBtn.innerHTML = `<span class="icon split-lr"></span>`;
+      toggleLayoutBtn.classList.add("is-disabled");
+      toggleLayoutBtn.setAttribute("aria-disabled", "true");
+    }
+
+    activeIndex = clamp(activeIndex, 0, n - 1);
+
+    highlightActive();
+    syncColorToggleUI();
+    syncSlidersToActive();
+    syncLabelToggleUI();
+    return;
+  }
+
+  // --------------------
+  // ここから従来の2枚モード
+  // --------------------
+  if (toggleLayoutBtn) {
+    toggleLayoutBtn.classList.remove("is-disabled");
+    toggleLayoutBtn.removeAttribute("aria-disabled");
+  }
+
   // layout class
   split.className = "split " + (p.layout || "split_lr");
 
@@ -394,7 +568,6 @@ async function render() {
 
     // badge
     if (p.labels?.enabled) {
-      // labelsの保険
       p.labels = p.labels || {};
       p.labels.items = p.labels.items || [{}, {}];
       p.labels.items[i] = p.labels.items[i] || { x: 0.06, y: 0.06, color: "#fff" };
@@ -404,20 +577,16 @@ async function render() {
       badge.textContent = labelText(p, i);
       pane.appendChild(badge);
 
-      // paneに付けてから位置補正（サイズ確定のため）
-      // いったん append 後に apply
-      // （下で split.appendChild(pane)するのでここではOK）
       installBadgeDrag(badge, pane, i);
+      installBadgeTextEdit(badge, i);
     }
 
     split.appendChild(pane);
 
-    // decode後にtransform/label位置を当てる
     try {
       await img.decode?.();
     } catch {}
 
-    // edits保険
     const ed = p.edits[i] || (p.edits[i] = { x: 0, y: 0, scale: 1, rotate: 0 });
 
     if (!ed._fitInited) {
@@ -431,7 +600,6 @@ async function render() {
 
     applyTransform(img, ed);
 
-    // badge位置反映（decode後のpaneサイズでクランプ）
     if (p.labels?.enabled) {
       const badge = pane.querySelector(".badge");
       if (badge) applyBadgeStyle(badge, pane, p.labels.items[i]);
@@ -450,7 +618,7 @@ async function render() {
 function updateOne(i) {
   const p = normalize();
   const pane = split.querySelector(`.pane[data-index="${i}"]`);
-  const img = pane?.querySelector("img");
+  const img = pane?.querySelector("img, .pane-img");
   if (img && p.edits[i]) applyTransform(img, p.edits[i]);
 }
 
@@ -481,6 +649,7 @@ targetBar?.addEventListener("click", (e) => {
 // ============================================================
 toggleLayoutBtn?.addEventListener("click", () => {
   const p = normalize();
+  if (p.images.length > 2) return; // グリッド中は無効
   p.layout = p.layout === "split_lr" ? "split_tb" : "split_lr";
   saveProject(p);
   render();
@@ -631,14 +800,19 @@ colorToggle?.addEventListener("click", () => {
   const cur = getCurrentLabelColor(p);
   const next = cur === "#fff" ? "#000" : "#fff";
 
-  p.labels.items[0].color = next;
-  p.labels.items[1].color = next;
+  const n = Math.min(p.images.length, 6);
+  p.labels = p.labels || {};
+  p.labels.items = p.labels.items || [];
+
+  for (let i = 0; i < n; i++) {
+    p.labels.items[i] = p.labels.items[i] || { x: 0.06, y: 0.06, color: "#fff" };
+    p.labels.items[i].color = next;
+  }
 
   saveProject(p);
 
-  split.querySelectorAll(".pane").forEach((pane) => {
-    const badge = pane.querySelector(".badge");
-    if (badge) badge.style.color = next;
+  split.querySelectorAll(".badge").forEach((badge) => {
+    badge.style.color = next;
   });
 
   syncColorToggleUI();
@@ -678,40 +852,58 @@ resetOneBtn?.addEventListener("click", () => {
 // ============================================================
 async function saveBoth() {
   const p = normalize();
+  let savedToGallery = false;
+  let savedToDevice = false;
 
-  // 保存用に参照だけURLへ解決したコピー
-  const pForExport = { ...p, images: [...p.images] };
-  const use = Math.min(2, pForExport.images.length);
-  for (let i = 0; i < use; i++) {
-    pForExport.images[i] = await resolveImageSrc(pForExport.images[i], 60 * 10);
-  }
-
-  const dataUrl = await composePNG(pForExport, { labels: pForExport.labels });
+  // ✅ compose → blob
+  const dataUrl = await composePNG(p, { labels: p.labels, ratio: p.ratio || "4:5" });
   const blob = dataURLToBlob(dataUrl);
 
-  await addToGallery({
-    fullBlob: blob,
-    meta: {
-      projectId: p.projectId,
-      ratio: p.ratio || "4:5",
-      layout: p.layout || "split_lr",
-      title: p.title || "",
-      createdFrom: "edit",
-    },
-  });
+  // ✅ ギャラリー保存（ここが成功したら success 扱い）
+  try {
+    await addToGallery({
+      fullBlob: blob,
+      meta: {
+        projectId: p.projectId,
+        ratio: p.ratio || "4:5",
+        layout: p.layout, // objectでも入る（必要ならJSON化してもOK）
+        title: p.title || "",
+        createdFrom: "edit",
+      },
+    });
+    savedToGallery = true;
+  } catch (e) {
+    console.error("GALLERY SAVE FAILED:", e);
+  }
 
-  await saveToDevice(blob, `beforeafter_${Date.now()}.png`);
-  window.location.href = "gallery.html";
+  // ✅ 端末保存（失敗してもギャラリーに入ってればOKにする）
+  try {
+    await saveToDevice(blob, `beforeafter_${Date.now()}.png`);
+    savedToDevice = true;
+  } catch (e) {
+    console.error("DEVICE SAVE FAILED:", e);
+  }
+
+  // ✅ どっちか成功してたらOK扱いで遷移
+  if (savedToGallery || savedToDevice) {
+    window.location.href = "gallery.html";
+    return;
+  }
+
+  // ✅ 両方失敗した時だけエラーにする
+  throw new Error("保存に失敗しました（ギャラリー/端末保存どちらも失敗）");
 }
 
 saveBtn?.addEventListener("click", async () => {
   try {
     await saveBoth();
   } catch (err) {
-    console.error("SAVE ERROR:", err);
+    console.error("SAVE ERROR DETAIL:", err);
+    console.error("STACK:", err?.stack);
     alert(`保存に失敗しました\n${err?.message || err}`);
   }
 });
+
 
 // ============================================================
 // Nav

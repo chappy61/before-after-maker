@@ -97,7 +97,7 @@ export async function composePNG(p, options) {
       ? optLabels.items
       : Array.isArray(projLabels.items)
       ? projLabels.items
-      : null,
+      : [],
   };
 
   const W = 1080;
@@ -117,14 +117,57 @@ export async function composePNG(p, options) {
   const gridW = Math.max(1, W - PAD * 2);
   const gridH = Math.max(1, H - PAD * 2);
 
-  // need 2 images
-  const need = 2;
-  if ((p.images?.length || 0) < need) throw new Error("画像が不足しています（2枚必要）");
+  // ✅ 最大6枚
+  const need = Math.min(6, p.images?.length || 0);
+  if (need < 2) throw new Error("画像が不足しています（2枚以上必要）");
 
   // load images (safe for canvas)
   const imgs = [];
   const revokers = [];
+
+  // layout resolve
+  function resolveLayout(p, need) {
+    // 新: オブジェクト {cols, rows, cells} で来る
+    if (p.layout && typeof p.layout === "object") {
+      const cols = Number(p.layout.cols || 0) || 1;
+      const rows = Number(p.layout.rows || 0) || 1;
+      return { cols, rows };
+    }
+
+    // 旧: 文字列 split_lr / split_tb
+    const layout = p.layout || "split_lr";
+    if (layout === "split_tb") return { cols: 1, rows: 2 };
+    if (layout === "split_lr") return { cols: 2, rows: 1 };
+
+    // 旧テンプレ
+    const legacy = makeGridTemplate(Number(p.count || need), layout);
+    return { cols: legacy.cols, rows: legacy.rows };
+  }
+
+  // ラベル文字（2枚なら before/after、それ以上は #）
+  function labelTextLocal(need, i) {
+    const t = labels.items?.[i]?.text;
+    if (typeof t === "string" && t.trim() !== "") return t.trim();
+
+    if (need === 2) return i === 0 ? "before" : "after";
+    return `#${i + 1}`;
+  }
+
+  // ラベル位置を安全に取り出し
+  function resolveLabelItem(i) {
+    const it = labels.items?.[i];
+    if (it && typeof it.x === "number" && typeof it.y === "number") {
+      return {
+        x: clamp01(it.x),
+        y: clamp01(it.y),
+        color: it.color === "#000" || it.color === "black" ? "#000" : "#fff",
+      };
+    }
+    return { x: 0.06, y: 0.06, color: "#fff" };
+  }
+
   try {
+    // ✅ need枚ぶんロード
     for (let i = 0; i < need; i++) {
       const { img, revoke } = await loadImageForCanvas(p.images[i], 600);
       imgs.push(img);
@@ -132,107 +175,83 @@ export async function composePNG(p, options) {
     }
 
     // cell calc
-    const layout = p.layout || "split_lr";
-    let cols = 2,
-      rows = 1;
+    const { cols, rows } = resolveLayout(p, need);
 
-    if (layout === "split_tb") {
-      cols = 1;
-      rows = 2;
-    } else if (layout === "split_lr") {
-      cols = 2;
-      rows = 1;
-    } else {
-      const legacy = makeGridTemplate(Number(p.count || 2), layout);
-      cols = legacy.cols;
-      rows = legacy.rows;
-    }
-
-    const total = cols * rows;
     const cellW = Math.max(1, (gridW - GAP * (cols - 1)) / cols);
     const cellH = Math.max(1, (gridH - GAP * (rows - 1)) / rows);
 
     // draw cells
-    let idx = 0;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = gridX + c * (cellW + GAP);
-        const y = gridY + r * (cellH + GAP);
-        const rad = Math.min(26, cellW / 6, cellH / 6);
+    for (let i = 0; i < need; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
 
-        ctx.save();
-        roundedRectPath(ctx, x, y, cellW, cellH, rad);
-        ctx.clip();
+      const x = gridX + c * (cellW + GAP);
+      const y = gridY + r * (cellH + GAP);
+      const rad = Math.min(26, cellW / 6, cellH / 6);
 
-        const raw = p.edits?.[idx] || { x: 0, y: 0, scale: 1, rotate: 0 };
+      ctx.save();
+      roundedRectPath(ctx, x, y, cellW, cellH, rad);
+      ctx.clip();
 
-        // 編集pane(px) → 出力cell(px)
-        const bw = raw.baseW || cellW;
-        const bh = raw.baseH || cellH;
-        const fx = cellW / bw;
-        const fy = cellH / bh;
+      const raw = p.edits?.[i] || { x: 0, y: 0, scale: 1, rotate: 0 };
 
-        const edit = {
-          x: (raw.x || 0) * fx,
-          y: (raw.y || 0) * fy,
-          rotate: raw.rotate || 0,
-          scale: raw.scale ?? 1, // ユーザー倍率そのまま
-        };
+      // 編集pane(px) → 出力cell(px)
+      // baseW/baseH が無ければ cell を基準にする
+      const bw = raw.baseW || cellW;
+      const bh = raw.baseH || cellH;
+      const fx = cellW / bw;
+      const fy = cellH / bh;
 
-        // ===== Editのpane比率に合わせてcellを再計算 =====
-        const bw2 = raw.baseW || cellW;
-        const bh2 = raw.baseH || cellH;
-        const paneAR = bw2 / bh2;
+      const edit = {
+        x: (raw.x || 0) * fx,
+        y: (raw.y || 0) * fy,
+        rotate: raw.rotate || 0,
+        scale: raw.scale ?? 1,
+      };
 
-        // cellW基準で高さ決定（Editと同じ比率）
-        let drawCellW = cellW;
-        let drawCellH = drawCellW / paneAR;
+      // ===== Editのpane比率に合わせてcellを再計算（可能なら）=====
+      const bw2 = raw.baseW || cellW;
+      const bh2 = raw.baseH || cellH;
+      const paneAR = bw2 / bh2;
 
-        // 高さはみ出すなら高さ基準に切替
-        if (drawCellH > cellH) {
-          drawCellH = cellH;
-          drawCellW = drawCellH * paneAR;
-        }
+      let drawCellW = cellW;
+      let drawCellH = drawCellW / paneAR;
 
-        // 中央寄せ
-        const cx = x + (cellW - drawCellW) / 2;
-        const cy = y + (cellH - drawCellH) / 2;
-
-        // ===== 描画 =====
-coverDrawTransformed(ctx, imgs[idx], cx, cy, drawCellW, drawCellH, edit);
-
-        ctx.restore();
-
-        idx++;
-        if (idx >= need) break;
+      if (drawCellH > cellH) {
+        drawCellH = cellH;
+        drawCellW = drawCellH * paneAR;
       }
-      if (idx >= need) break;
+
+      const cx = x + (cellW - drawCellW) / 2;
+      const cy = y + (cellH - drawCellH) / 2;
+
+      coverDrawTransformed(ctx, imgs[i], cx, cy, drawCellW, drawCellH, edit);
+
+      ctx.restore();
     }
 
-    // labels
-    if (labels.enabled && total === 2) {
-      function resolveItem(i) {
-        const it = labels.items?.[i];
-        if (it && typeof it.x === "number" && typeof it.y === "number") {
-          return {
-            x: clamp01(it.x),
-            y: clamp01(it.y),
-            color: it.color === "#000" || it.color === "black" ? "#000" : "#fff",
-          };
-        }
-        return { x: 0.06, y: 0.06, color: "#fff" };
-      }
+    // labels（✅ 2枚限定をやめて、need枚ぶん描画）
+    if (labels.enabled) {
+      const ox = Number(labels.offsetX || 0);
+      const oy = Number(labels.offsetY || 0);
 
-      function drawAtCell(text, cellLeft, cellTop, cw, ch, i) {
-        const it = resolveItem(i);
-        const ox = Number(labels.offsetX || 0);
-        const oy = Number(labels.offsetY || 0);
+      for (let i = 0; i < need; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
 
-        const size = 80;
+        const cellLeft = gridX + c * (cellW + GAP);
+        const cellTop = gridY + r * (cellH + GAP);
+
+        const it = resolveLabelItem(i);
+        const text = labelTextLocal(need, i);
+
+        // 位置
+        let tx = cellLeft + it.x * cellW + ox;
+        let ty = cellTop + it.y * cellH + oy;
+
+        // 文字サイズ（枚数が増えると少し小さくした方が収まり良い）
+        const size = need <= 2 ? 80 : need <= 4 ? 64 : 54;
         const font = `600 ${size}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif`;
-
-        let tx = cellLeft + it.x * cw + ox;
-        let ty = cellTop + it.y * ch + oy;
 
         // keep in bounds
         const pad = 12;
@@ -241,29 +260,15 @@ coverDrawTransformed(ctx, imgs[idx], cx, cy, drawCellW, drawCellH, edit);
         const tw = ctx.measureText(text).width;
         ctx.restore();
 
-        tx = Math.max(cellLeft + pad, Math.min(cellLeft + cw - pad - tw, tx));
-        ty = Math.max(cellTop + pad, Math.min(cellTop + ch - pad - size, ty));
+        tx = Math.max(cellLeft + pad, Math.min(cellLeft + cellW - pad - tw, tx));
+        ty = Math.max(cellTop + pad, Math.min(cellTop + cellH - pad - size, ty));
 
         drawLabelText(ctx, text, tx, ty, { color: it.color, size });
       }
-
-      const cell0 = { x: gridX, y: gridY, w: cellW, h: cellH };
-
-      if (cols === 2) {
-        const cell1 = { x: gridX + (cellW + GAP), y: gridY, w: cellW, h: cellH };
-        drawAtCell("before", cell0.x, cell0.y, cell0.w, cell0.h, 0);
-        drawAtCell("after", cell1.x, cell1.y, cell1.w, cell1.h, 1);
-      } else {
-        const cell1 = { x: gridX, y: gridY + (cellH + GAP), w: cellW, h: cellH };
-        drawAtCell("before", cell0.x, cell0.y, cell0.w, cell0.h, 0);
-        drawAtCell("after", cell1.x, cell1.y, cell1.w, cell1.h, 1);
-      }
     }
 
-    // ✅ これで tainted 回避できて toDataURL が通る
     return canvas.toDataURL("image/png");
   } finally {
-    // blob: URL を掃除
     for (const r of revokers) r();
   }
 }

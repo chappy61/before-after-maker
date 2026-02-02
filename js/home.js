@@ -40,16 +40,13 @@ function resetProjectForNew(){
   p.count  = 0;
   p.theme  = p.theme || "green";
 
-  // labels を最低限維持（edit/composeが期待する形）
+  // labels（枚数に合わせて ingestFiles 側で調整する）
   if (!p.labels || typeof p.labels !== "object") {
     p.labels = { enabled: true, items: [] };
   }
   if (typeof p.labels.enabled !== "boolean") p.labels.enabled = true;
   if (!Array.isArray(p.labels.items)) p.labels.items = [];
-  while (p.labels.items.length < 2) {
-    p.labels.items.push({ x: 0.06, y: 0.06, color: "#fff" });
-  }
-  p.labels.items = p.labels.items.slice(0, 2);
+
 
   // ratio/title も空なら入れる（composeが使う）
   p.ratio = p.ratio || "4:5";
@@ -57,6 +54,13 @@ function resetProjectForNew(){
 
   saveProject(p);
   return p;
+}
+
+function pickLayout(n){
+  if (n <= 2) return { cols: 2, rows: 1, cells: 2 };
+  if (n === 3) return { cols: 3, rows: 1, cells: 3 };
+  if (n === 4) return { cols: 2, rows: 2, cells: 4 };
+  return { cols: 3, rows: 2, cells: 6 }; // 5-6は6枠の器
 }
 
 async function ingestFiles(fileList){
@@ -90,20 +94,34 @@ async function ingestFiles(fileList){
       p.images.push(path);
     }
 
-    p.edits = p.images.map(() => ({ scale: 1, rotate: 0, x: 0, y: 0 }));
-    p.count = p.images.length;
+    const n = p.images.length;
+    p.count = n;
+
+    // edits を枚数ぶん
+    p.edits = Array.from({ length: n }, () => ({ scale: 1, rotate: 0, x: 0, y: 0 }));
+
+    // labels を枚数ぶん
+    if (!p.labels) p.labels = { enabled: true, items: [] };
+    if (!Array.isArray(p.labels.items)) p.labels.items = [];
+    while (p.labels.items.length < n) {
+      p.labels.items.push({ x: 0.06, y: 0.06, color: "#fff" });
+    }
+    p.labels.items = p.labels.items.slice(0, n);
+
+    // layout
+    p.layout = pickLayout(n);
 
     saveProject(p);
     setStatus("");
     window.location.href = "edit.html";
 
-    } catch (e) {
+  } catch (e) {
     console.error(e);
     alert(`アップロード/遷移に失敗: ${e?.message || e}`);
     setStatus?.(`失敗: ${e?.message || e}`);
   }
-
 }
+
 newBtn?.addEventListener("click", async () => {
   // どっちを開くか：PC/iPadはピッカー、スマホはカメラ優先にしたいなら分岐
   // まずは安定の pickPhotos を開く（iPhoneでも撮影/ライブラリ両方出ることが多い）

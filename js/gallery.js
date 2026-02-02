@@ -171,8 +171,7 @@ function renderCurrentYear() {
   const monthMap = groupByMonthAndDay(items);
   const months = [...monthMap.keys()].sort().reverse();
 
-  const targetMonth = months.find(m => m.endsWith("-01")) || months[0];
-  const monthList = targetMonth ? [targetMonth] : [];
+  const monthList = months;
 
   const monthSections = monthList.map((ym) => {
     const dayMap = monthMap.get(ym);

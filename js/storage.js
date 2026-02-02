@@ -45,7 +45,7 @@ export function ensureProject() {
     if (typeof existing.labels.enabled !== "boolean") existing.labels.enabled = true;
     if (!Array.isArray(existing.labels.items)) existing.labels.items = [];
 
-    const use = Math.min(2, existing.images.length);
+    const use = Math.min(existing.images.length, 6);
     while (existing.labels.items.length < use) {
       const i = existing.labels.items.length;
       existing.labels.items.push({
