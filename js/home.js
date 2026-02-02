@@ -2,6 +2,8 @@ import { requireAuthOrRedirect } from "./passcodeAuth.js";
 import { supabase } from "./supabaseClient.js";
 import { ensureProject, saveProject } from "./storage.js";
 import { uploadToGallery } from "./storage.js";
+import { registerSW } from "./register-sw.js";
+registerSW();
 
 (async () => {
   // スマホが未ログインならログインへ飛ばす

@@ -40,6 +40,10 @@ let activeIndex = 0;
 const pointers = new Map(); // pointerId -> {x,y}
 let gesture = null; // {type:'drag'|'pinch', ...}
 
+split?.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+});
+
 // ============================================================
 // Utils
 // ============================================================
@@ -121,11 +125,21 @@ function normalize() {
   }
   p.labels.items = p.labels.items.slice(0, n);
 
-  p.labels.items = p.labels.items.map((it) => ({
-    x: typeof it.x === "number" ? clamp01(it.x) : 0.06,
-    y: typeof it.y === "number" ? clamp01(it.y) : 0.06,
-    color: it?.color === "#000" || it?.color === "black" ? "#000" : "#fff",
-  }));
+  p.labels.items = p.labels.items.map((it) => {
+    const obj = (it && typeof it === "object") ? it : {};
+    const text =
+      typeof obj.text === "string" && obj.text.trim() !== ""
+        ? obj.text.trim()
+        : undefined;
+
+    return {
+      ...obj, // ✅ text など他の情報を保持
+      x: typeof obj.x === "number" ? clamp01(obj.x) : 0.06,
+      y: typeof obj.y === "number" ? clamp01(obj.y) : 0.06,
+      color: obj?.color === "#000" || obj?.color === "black" ? "#000" : "#fff",
+      ...(text ? { text } : {}), // ✅ 空文字は保存しない（自動ラベルに戻す）
+    };
+  });
 
   return p;
 }
@@ -137,6 +151,7 @@ function labelText(p, i) {
   if (p.images.length === 2) return i === 0 ? "before" : "after";
   return `#${i + 1}`;
 }
+
 
 function layoutForCount(n){
   if (n <= 2) return { cols: 2, rows: 1, cells: 2 };
@@ -202,6 +217,8 @@ async function renderGrid(p) {
       pane.appendChild(badge);
 
       installBadgeDrag(badge, pane, i);
+      installBadgeTextEdit(badge, i);
+
     }
 
     splitEl.appendChild(pane);
@@ -306,26 +323,53 @@ function applyBadgeStyle(badge, pane, label) {
 }
 
 function installBadgeTextEdit(badge, index) {
-  // PC: dblclick
-  badge.addEventListener("dblclick", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openLabelEditor(index);
+  badge.style.userSelect = "none";
+  badge.style.webkitUserSelect = "none";
+  badge.style.webkitTouchCallout = "none";
+  badge.style.touchAction = "none";
+
+  let timer = null;
+  let startX = 0, startY = 0;
+  let moved = false;
+
+  const HOLD_MS = 450;
+  const MOVE_TOL = 8;
+
+  badge.addEventListener("pointerdown", (e) => {
+    // ドラッグ処理と共存：編集は「長押しだけ」で開く
+    startX = e.clientX;
+    startY = e.clientY;
+    moved = false;
+
+    timer = setTimeout(() => {
+      timer = null;
+      openLabelEditor(index);
+    }, HOLD_MS);
   });
 
-  // Mobile: double tap
-  let lastTap = 0;
-  badge.addEventListener("click", (e) => {
-    // dragのpointerdownと干渉しないよう、click側で判定
-    const now = Date.now();
-    const dt = now - lastTap;
-    lastTap = now;
-
-    if (dt < 320) {
-      e.preventDefault();
-      e.stopPropagation();
-      openLabelEditor(index);
+  badge.addEventListener("pointermove", (e) => {
+    if (!timer) return;
+    const dx = Math.abs(e.clientX - startX);
+    const dy = Math.abs(e.clientY - startY);
+    if (dx > MOVE_TOL || dy > MOVE_TOL) {
+      moved = true;
+      clearTimeout(timer);
+      timer = null;
     }
+  });
+
+  const end = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+
+  badge.addEventListener("pointerup", end);
+  badge.addEventListener("pointercancel", end);
+  badge.addEventListener("pointerleave", end);
+
+  // contextmenu（長押しメニュー）殺す
+  badge.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
   });
 }
 
@@ -336,9 +380,7 @@ function openLabelEditor(index) {
   p.labels.items[index] = p.labels.items[index] || { x: 0.06, y: 0.06, color: "#fff" };
 
   const current = p.labels.items[index].text || "";
-  const next = prompt(`ラベル文字を入力（空でリセット）`, current);
-
-  // キャンセル
+  const next = prompt("ラベル文字を入力（空で自動に戻す）", current);
   if (next === null) return;
 
   const v = String(next).trim();
@@ -346,7 +388,7 @@ function openLabelEditor(index) {
   else p.labels.items[index].text = v;
 
   saveProject(p);
-  render(); // バッジ文字も更新
+  render();
 }
 
 function installBadgeDrag(badge, pane, index) {
@@ -419,23 +461,29 @@ function installBadgeDrag(badge, pane, index) {
       y: y01,
     };
 
-    saveProject(p);
     applyBadgeStyle(badge, pane, p.labels.items[index]);
   });
 
-  function endDrag(e) {
+    function endDrag(e) {
     if (!dragging) return;
     dragging = false;
 
     try {
       if (badge.hasPointerCapture(e.pointerId)) badge.releasePointerCapture(e.pointerId);
     } catch {}
+
+    // ✅ ドラッグ終わったタイミングで1回だけ保存
+    try {
+      saveProject(normalize());
+    } catch {}
   }
 
   badge.addEventListener("pointerup", endDrag);
   badge.addEventListener("pointercancel", endDrag);
   badge.addEventListener("lostpointercapture", () => {
-    dragging = false;
+  if (!dragging) return;
+  dragging = false;
+  try { saveProject(normalize()); } catch {}
   });
 }
 
@@ -743,7 +791,7 @@ split?.addEventListener("pointermove", (e) => {
     const dy = e.clientY - gesture.startY;
     ed.x = Math.round(gesture.baseX + dx);
     ed.y = Math.round(gesture.baseY + dy);
-    saveProject(p);
+  
     updateOne(activeIndex);
     return;
   }
@@ -785,12 +833,19 @@ split?.addEventListener("pointermove", (e) => {
 function endPointer(e) {
   if (!pointers.has(e.pointerId)) return;
   pointers.delete(e.pointerId);
-  if (pointers.size === 0) gesture = null;
+
+  if (pointers.size === 0) {
+    gesture = null;
+
+    // ✅ 指が全部離れた瞬間に1回だけ保存
+    try {
+      saveProject(normalize());
+    } catch {}
+  }
 }
 
 split?.addEventListener("pointerup", endPointer);
 split?.addEventListener("pointercancel", endPointer);
-split?.addEventListener("pointerleave", endPointer);
 
 // ============================================================
 // Label color toggle (WHITE <-> BLACK) 2枚共通

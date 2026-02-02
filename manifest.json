@@ -1,0 +1,28 @@
+{
+  "name": "BeforeAfter Maker",
+  "short_name": "BeforeAfter",
+  "description": "Before/After and multi-grid image maker",
+  "start_url": "/before-after-maker/index.html",
+  "scope": "/before-after-maker/",
+  "display": "standalone",
+  "background_color": "#8fae7b",
+  "theme_color": "#f1ecd2",
+  "icons": [
+    {
+      "src": "/before-after-maker/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/before-after-maker/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/before-after-maker/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
