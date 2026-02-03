@@ -114,9 +114,8 @@
   max-width: 520px;
   margin: 0 auto;
   padding: 24px 16px;
-  padding-top: min(20vh, 60px);
+  padding-top: min(20vh, 120px);
   min-height: 60vh;
-  transform: translateX(-90px);
 }
 .home-wrapper {
   display: flex;
@@ -181,10 +180,8 @@
 }
 .app-footer {
   text-align: center;
+  font-size: 11px;
   color: rgba(0, 0, 0, 0.35);
+  padding: 12px 0 10px;
   user-select: none;
-  flex: 0 0 auto;
-  padding: 6px 0 6px;
-  font-size: 10px;
-  line-height: 1.2;
 }
