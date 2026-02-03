@@ -41,7 +41,8 @@ function drawLabelText(ctx, text, x, y, opt = {}) {
   ctx.textAlign = "left";
   ctx.fillStyle = color;
 
-  ctx.shadowColor = color === "#000" ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.28)";
+  ctx.shadowColor =
+    color === "#000" ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.28)";
   ctx.shadowBlur = 6;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 2;
@@ -72,7 +73,8 @@ async function loadImageForCanvas(src, expiresSec = 600) {
 
   // ここが重要：fetchして blob: に変換（canvas taint回避）
   const res = await fetch(url, { mode: "cors", cache: "no-store" });
-  if (!res.ok) throw new Error(`image fetch failed: ${res.status} ${res.statusText}`);
+  if (!res.ok)
+    throw new Error(`image fetch failed: ${res.status} ${res.statusText}`);
   const blob = await res.blob();
 
   const blobUrl = URL.createObjectURL(blob);
@@ -96,8 +98,8 @@ export async function composePNG(p, options) {
     items: Array.isArray(optLabels.items)
       ? optLabels.items
       : Array.isArray(projLabels.items)
-      ? projLabels.items
-      : [],
+        ? projLabels.items
+        : [],
   };
 
   const W = 1080;
@@ -187,7 +189,7 @@ export async function composePNG(p, options) {
 
       const x = gridX + c * (cellW + GAP);
       const y = gridY + r * (cellH + GAP);
-      const rad = Math.min(26, cellW / 6, cellH / 6);
+      const rad = 0;
 
       ctx.save();
       roundedRectPath(ctx, x, y, cellW, cellH, rad);
@@ -195,24 +197,10 @@ export async function composePNG(p, options) {
 
       const raw = p.edits?.[i] || { x: 0, y: 0, scale: 1, rotate: 0 };
 
-      // 編集pane(px) → 出力cell(px)
-      // baseW/baseH が無ければ cell を基準にする
+      // ===== Editのpane比率に合わせて描画枠を決定 =====
       const bw = raw.baseW || cellW;
       const bh = raw.baseH || cellH;
-      const fx = cellW / bw;
-      const fy = cellH / bh;
-
-      const edit = {
-        x: (raw.x || 0) * fx,
-        y: (raw.y || 0) * fy,
-        rotate: raw.rotate || 0,
-        scale: raw.scale ?? 1,
-      };
-
-      // ===== Editのpane比率に合わせてcellを再計算（可能なら）=====
-      const bw2 = raw.baseW || cellW;
-      const bh2 = raw.baseH || cellH;
-      const paneAR = bw2 / bh2;
+      const paneAR = bw / bh;
 
       let drawCellW = cellW;
       let drawCellH = drawCellW / paneAR;
@@ -225,12 +213,23 @@ export async function composePNG(p, options) {
       const cx = x + (cellW - drawCellW) / 2;
       const cy = y + (cellH - drawCellH) / 2;
 
+      // ★換算は drawCellW/H 基準
+      const fx = drawCellW / bw;
+      const fy = drawCellH / bh;
+
+      const edit = {
+        x: (raw.x || 0) * fx,
+        y: (raw.y || 0) * fy,
+        rotate: raw.rotate || 0,
+        scale: raw.scale ?? 1,
+      };
+
       coverDrawTransformed(ctx, imgs[i], cx, cy, drawCellW, drawCellH, edit);
 
       ctx.restore();
     }
 
-    // labels（✅ 2枚限定をやめて、need枚ぶん描画）
+    // labels（写真枠 drawCellW/H 基準で描画）
     if (labels.enabled) {
       const ox = Number(labels.offsetX || 0);
       const oy = Number(labels.offsetY || 0);
@@ -239,29 +238,53 @@ export async function composePNG(p, options) {
         const r = Math.floor(i / cols);
         const c = i % cols;
 
+        // セルの左上
         const cellLeft = gridX + c * (cellW + GAP);
         const cellTop = gridY + r * (cellH + GAP);
 
+        // 写真枠（drawCellW/H）をセル内中央に作る（※画像描画と同じ計算）
+        const raw = p.edits?.[i] || { x: 0, y: 0, scale: 1, rotate: 0 };
+        const bw = raw.baseW || cellW;
+        const bh = raw.baseH || cellH;
+        const paneAR = bw / bh;
+
+        let drawCellW = cellW;
+        let drawCellH = drawCellW / paneAR;
+        if (drawCellH > cellH) {
+          drawCellH = cellH;
+          drawCellW = drawCellH * paneAR;
+        }
+
+        const frameLeft = cellLeft + (cellW - drawCellW) / 2;
+        const frameTop = cellTop + (cellH - drawCellH) / 2;
+
+        // ラベル情報
         const it = resolveLabelItem(i);
         const text = labelTextLocal(need, i);
 
-        // 位置
-        let tx = cellLeft + it.x * cellW + ox;
-        let ty = cellTop + it.y * cellH + oy;
+        // 位置：写真枠の左上 + x/y(0..1) * 写真枠サイズ
+        let tx = frameLeft + it.x * drawCellW + ox;
+        let ty = frameTop + it.y * drawCellH + oy;
 
-        // 文字サイズ（枚数が増えると少し小さくした方が収まり良い）
+        // 文字サイズ
         const size = need <= 2 ? 80 : need <= 4 ? 64 : 54;
         const font = `600 ${size}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif`;
 
-        // keep in bounds
+        // 枠内に収める（写真枠の中でクランプ）
         const pad = 12;
         ctx.save();
         ctx.font = font;
         const tw = ctx.measureText(text).width;
         ctx.restore();
 
-        tx = Math.max(cellLeft + pad, Math.min(cellLeft + cellW - pad - tw, tx));
-        ty = Math.max(cellTop + pad, Math.min(cellTop + cellH - pad - size, ty));
+        tx = Math.max(
+          frameLeft + pad,
+          Math.min(frameLeft + drawCellW - pad - tw, tx),
+        );
+        ty = Math.max(
+          frameTop + pad,
+          Math.min(frameTop + drawCellH - pad - size, ty),
+        );
 
         drawLabelText(ctx, text, tx, ty, { color: it.color, size });
       }

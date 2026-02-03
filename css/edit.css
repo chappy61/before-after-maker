@@ -3,7 +3,7 @@
   width: 100%;
   aspect-ratio: 4 / 5;
   position: relative;
-  border-radius: 16px;
+  border-radius: 0px;
   overflow: hidden;
 }
 
@@ -13,7 +13,7 @@
   display: grid;
   gap: 1px;
   background: rgba(0, 0, 0, 0.18); /* divider */
-  border-radius: 16px;
+  border-radius: 0px;
   overflow: hidden;
 }
 
@@ -28,7 +28,7 @@
 .pane {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 0px;
   background: rgba(0, 0, 0, 0.08);
   touch-action: none;
 
@@ -53,7 +53,7 @@
   transform-origin: 50% 50%;
   user-select: none;
   -webkit-user-drag: none;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 /* ========= Label (text only) ========= */
@@ -61,7 +61,7 @@
   position: absolute;
   padding: 6px 10px;
   border-radius: 999px; /* shape only; no bg */
-  font-size: 34px; /* ← ここで見た目サイズ調整（画面側） */
+  font-size: var(--badge-size, 34px);
   letter-spacing: 0.02em;
   line-height: 1;
   color: rgba(255, 255, 255, 0.92);
@@ -125,6 +125,43 @@
   background: #fff;
   border: 2px solid rgba(0, 0, 0, 0.25);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.rangeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.cap {
+  min-width: 42px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  user-select: none;
+}
+
+.nudge {
+  width: 30px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.22);
+  color: rgba(0, 0, 0, 0.75);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tool .v {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 /* ========= Layout toggle icon ========= */
@@ -328,15 +365,7 @@
 .split .pane {
   position: relative;
   overflow: hidden;
-  border-radius: 14px;
-}
-
-.split .pane img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  will-change: transform;
+  border-radius: 0px;
 }
 
 .split .pane .pane-label {
@@ -353,19 +382,4 @@
 
 .split .pane.empty {
   opacity: 0.12;
-}
-.pane,
-.pane * {
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-
-.badge,
-.pane-img,
-.pane img {
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  touch-action: none;
 }

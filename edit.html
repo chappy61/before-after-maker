@@ -2,10 +2,19 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-    <link rel="apple-touch-icon" href="/before-after-maker/icons/icon-192.png" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="/before-after-maker/icons/icon-192.png"
+    />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <title>BeforeAfter Maker - Edit</title>
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/components.css" />
@@ -33,22 +42,89 @@
 
         <div class="tool">
           <div class="k">scale</div>
-          <input type="range" id="scaleRange" min="0.2" max="3.0" step="0.01" value="1" />
+
+          <div class="rangeRow">
+            <span class="cap" id="scaleMin">0.20</span>
+            <button class="nudge" id="scaleMinus" type="button">−</button>
+
+            <input
+              type="range"
+              id="scaleRange"
+              min="0.2"
+              max="3.0"
+              step="0.01"
+              value="1"
+            />
+
+            <button class="nudge" id="scalePlus" type="button">＋</button>
+            <span class="cap" id="scaleMax">3.00</span>
+          </div>
+
+          <span class="v" id="scaleVal">1.00</span>
         </div>
 
         <div class="tool">
           <div class="k">rotate</div>
-          <input type="range" id="rotateRange" min="-45" max="45" step="1" value="0" />
+
+          <div class="rangeRow">
+            <span class="cap" id="rotMin">-45°</span>
+            <button class="nudge" id="rotMinus" type="button">−</button>
+
+            <input
+              type="range"
+              id="rotateRange"
+              min="-45"
+              max="45"
+              step="1"
+              value="0"
+            />
+
+            <button class="nudge" id="rotPlus" type="button">＋</button>
+            <span class="cap" id="rotMax">+45°</span>
+          </div>
+
+          <span class="v" id="rotateVal">0°</span>
         </div>
+        <div class="tool">
+          <div class="k">label size</div>
+
+          <div class="rangeRow">
+            <span class="cap" id="lblMin">10</span>
+            <button class="nudge" id="lblMinus" type="button">−</button>
+
+            <input
+              type="range"
+              id="labelSizeRange"
+              min="10"
+              max="48"
+              step="1"
+              value="18"
+            />
+
+            <button class="nudge" id="lblPlus" type="button">＋</button>
+            <span class="cap" id="lblMax">48</span>
+          </div>
+
+          <span class="v" id="labelSizeVal">18px</span>
+        </div>
+
         <div class="label-color-toggle">
           <span class="toggle-label">label color</span>
           <div class="label-controls">
-            <div id="colorToggle" class="color-toggle" role="switch" aria-checked="false" tabindex="0">
+            <div
+              id="colorToggle"
+              class="color-toggle"
+              role="switch"
+              aria-checked="false"
+              tabindex="0"
+            >
               <span class="toggle-text left">W</span>
               <span class="toggle-text right">B</span>
               <span class="toggle-knob"></span>
             </div>
-            <button id="labelToggle" type="button" class="toolbtn">label</button>
+            <button id="labelToggle" type="button" class="toolbtn">
+              label
+            </button>
           </div>
         </div>
 

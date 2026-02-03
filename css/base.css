@@ -131,6 +131,9 @@ main,
   border-radius: var(--radius);
   overflow: hidden;
   backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
 }
 
 /* ---------------------------------------------------------
@@ -174,6 +177,8 @@ p {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
+  padding-top: 210px; /* ← ここで下げる */
+  padding-bottom: 12px;
 }
 
 /* topbar内のタイトルは少し詰めてOK（ただし重複しないようここで上書き） */
@@ -184,6 +189,12 @@ p {
 }
 
 .content {
+  flex: 1 1 auto;
+  min-height: 0; /* ← これ超重要。はみ出し/余白バグ予防 */
+  display: flex;
+  align-items: center; /* 中央寄せしたいなら */
+  justify-content: center; /* 中央寄せしたいなら */
+  padding-bottom: 0;
   padding: 18px 16px 16px;
 }
 
