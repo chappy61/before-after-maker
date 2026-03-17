@@ -1,7 +1,6 @@
 // js/passcodeAuth.js
 import { supabase } from "./supabaseClient.js";
-localStorage.removeItem("pc_fails");
-localStorage.removeItem("pc_lock_until");
+
 // ===== 設定（ここだけ変える）=====
 const PASSCODE = "1234"; // 4桁（サロン用）
 const EMAIL = "salon@app.local"; // Supabaseに作る共有ユーザー
