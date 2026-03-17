@@ -133,19 +133,6 @@
   margin-top: 2px;
 }
 
-.cap {
-  min-width: 42px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  font-size: 12px;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  user-select: none;
-}
-
 .nudge {
   width: 30px;
   height: 26px;
@@ -158,10 +145,17 @@
 }
 
 .tool .v {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
   opacity: 0.9;
+  min-width: 42px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  user-select: none;
 }
 
 /* ========= Layout toggle icon ========= */

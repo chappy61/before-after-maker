@@ -25,8 +25,12 @@ let overlayOpen = false;
 // ---------------------
 // Utils
 // ---------------------
-function pad2(n) { return String(n).padStart(2, "0"); }
-function yearKey(ts) { return String(new Date(ts).getFullYear()); }
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+function yearKey(ts) {
+  return String(new Date(ts).getFullYear());
+}
 function ymKey(ts) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
@@ -40,12 +44,16 @@ function dateLabelFromKey(key) {
   return `${mm}/${dd}`;
 }
 function safeHTML(s) {
-  return String(s).replace(/[&<>"']/g, (m) => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]
-  ));
+  return String(s).replace(
+    /[&<>"']/g,
+    (m) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        m
+      ],
+  );
 }
 function getYearsFromAllItems() {
-  const set = new Set(allItems.map(it => yearKey(it.createdAt)));
+  const set = new Set(allItems.map((it) => yearKey(it.createdAt)));
   return [...set].sort().reverse();
 }
 
@@ -135,10 +143,12 @@ function renderYearbar() {
     return;
   }
 
-  const chips = years.map(y => {
-    const active = (y === selectedYear) ? " is-active" : "";
-    return `<button class="yearchip${active}" data-year="${safeHTML(y)}">${safeHTML(y)}年</button>`;
-  }).join("");
+  const chips = years
+    .map((y) => {
+      const active = y === selectedYear ? " is-active" : "";
+      return `<button class="yearchip${active}" data-year="${safeHTML(y)}">${safeHTML(y)}年</button>`;
+    })
+    .join("");
 
   yearbarEl.innerHTML = chips;
 
@@ -166,34 +176,38 @@ function renderCurrentYear() {
   }
   if (!selectedYear) selectedYear = years[0];
 
-  const items = allItems.filter(it => yearKey(it.createdAt) === selectedYear);
+  const items = allItems.filter((it) => yearKey(it.createdAt) === selectedYear);
 
   const monthMap = groupByMonthAndDay(items);
   const months = [...monthMap.keys()].sort().reverse();
 
   const monthList = months;
 
-  const monthSections = monthList.map((ym) => {
-    const dayMap = monthMap.get(ym);
-    const days = [...dayMap.keys()].sort().reverse();
+  const monthSections = monthList
+    .map((ym) => {
+      const dayMap = monthMap.get(ym);
+      const days = [...dayMap.keys()].sort().reverse();
 
-    const daySections = days.map((dayKeyStr) => {
-      const arr = dayMap.get(dayKeyStr);
-      const label = dateLabelFromKey(dayKeyStr);
+      const daySections = days
+        .map((dayKeyStr) => {
+          const arr = dayMap.get(dayKeyStr);
+          const label = dateLabelFromKey(dayKeyStr);
 
-      const thumbs = arr.map((it) => {
-        const url = it.thumbUrl;
-        const id = safeHTML(it.id);
-        return `
+          const thumbs = arr
+            .map((it) => {
+              const url = it.thumbUrl;
+              const id = safeHTML(it.id);
+              return `
           <div class="gitem" data-id="${id}">
             <img src="${safeHTML(url)}" alt="thumb" />
             <div class="gcheck" aria-hidden="true">✓</div>
           </div>
         `;
-      }).join("");
+            })
+            .join("");
 
-      // 日付summaryにもチェック付ける（まとめ選択用）
-      return `
+          // 日付summaryにもチェック付ける（まとめ選択用）
+          return `
         <details class="gsection" data-date="${safeHTML(dayKeyStr)}">
           <summary class="gsummary">
             <div class="gmeta">
@@ -207,10 +221,11 @@ function renderCurrentYear() {
           </div>
         </details>
       `;
-    }).join("");
+        })
+        .join("");
 
-    // 月summaryにもチェック
-    return `
+      // 月summaryにもチェック
+      return `
       <details class="gmonth" open data-month="${safeHTML(ym)}">
         <summary class="gsummary gsummary-month">
           <div class="gmeta">
@@ -224,7 +239,8 @@ function renderCurrentYear() {
         </div>
       </details>
     `;
-  }).join("");
+    })
+    .join("");
 
   galleryEl.innerHTML = monthSections;
 
@@ -243,7 +259,9 @@ function bindAccordion() {
   galleryEl.querySelectorAll(".gmonth").forEach((monthDetails) => {
     monthDetails.addEventListener("toggle", () => {
       if (!monthDetails.open) return;
-      galleryEl.querySelectorAll(".gmonth").forEach((d) => { if (d !== monthDetails) d.open = false; });
+      galleryEl.querySelectorAll(".gmonth").forEach((d) => {
+        if (d !== monthDetails) d.open = false;
+      });
     });
   });
 
@@ -251,7 +269,9 @@ function bindAccordion() {
     dayDetails.addEventListener("toggle", () => {
       if (!dayDetails.open) return;
       const monthBody = dayDetails.closest(".gmonth-body") || galleryEl;
-      monthBody.querySelectorAll(".gsection").forEach((d) => { if (d !== dayDetails) d.open = false; });
+      monthBody.querySelectorAll(".gsection").forEach((d) => {
+        if (d !== dayDetails) d.open = false;
+      });
     });
   });
 }
@@ -265,7 +285,10 @@ function createOverlayIfNeeded() {
   const el = document.createElement("div");
   el.id = "overlay";
   el.className = "overlay hidden";
-  el.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); });
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
 
   el.innerHTML = `
     <div class="overlay-box" role="dialog" aria-modal="true">
@@ -277,12 +300,21 @@ function createOverlayIfNeeded() {
   `;
 
   document.body.appendChild(el);
-  document.getElementById("overlayClose").addEventListener("click", closeOverlay);
+  document
+    .getElementById("overlayClose")
+    .addEventListener("click", closeOverlay);
 
-  window.addEventListener("keydown", (e) => {
-    if (!overlayOpen) return;
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); }
-  }, { capture: true });
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (!overlayOpen) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    { capture: true },
+  );
 }
 
 async function openOverlayById(id) {
@@ -377,7 +409,9 @@ function bindPressAndClicks() {
       enterSelectMode();
 
       // その日配下の画像IDを全部
-      const ids = [...section.querySelectorAll(".gitem")].map(x => String(x.dataset.id));
+      const ids = [...section.querySelectorAll(".gitem")].map((x) =>
+        String(x.dataset.id),
+      );
       bulkToggle(ids);
       return;
     }
@@ -390,7 +424,9 @@ function bindPressAndClicks() {
 
       enterSelectMode();
 
-      const ids = [...month.querySelectorAll(".gitem")].map(x => String(x.dataset.id));
+      const ids = [...month.querySelectorAll(".gitem")].map((x) =>
+        String(x.dataset.id),
+      );
       bulkToggle(ids);
       return;
     }
@@ -402,8 +438,8 @@ function bindPressAndClicks() {
     if (y) {
       enterSelectMode();
       const ids = allItems
-        .filter(it => yearKey(it.createdAt) === String(y))
-        .map(it => String(it.id));
+        .filter((it) => yearKey(it.createdAt) === String(y))
+        .map((it) => String(it.id));
       bulkToggle(ids);
     }
   });
@@ -417,17 +453,17 @@ function bindPressAndClicks() {
 
     enterSelectMode();
     const ids = allItems
-      .filter(it => yearKey(it.createdAt) === String(y))
-      .map(it => String(it.id));
+      .filter((it) => yearKey(it.createdAt) === String(y))
+      .map((it) => String(it.id));
     bulkToggle(ids);
   });
 }
 
 function bulkToggle(ids) {
   // 全部選択されてたら解除、そうでなければ全選択
-  const allOn = ids.length > 0 && ids.every(id => selectedIds.has(id));
-  if (allOn) ids.forEach(id => selectedIds.delete(id));
-  else ids.forEach(id => selectedIds.add(id));
+  const allOn = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+  if (allOn) ids.forEach((id) => selectedIds.delete(id));
+  else ids.forEach((id) => selectedIds.add(id));
 
   renderTopbarRight();
   refreshSelectionMarks();
@@ -452,7 +488,9 @@ function installLongPress(root, onFire) {
 
     timer = setTimeout(() => {
       fired = true;
-      try { onFire(e.target); } catch {}
+      try {
+        onFire(e.target);
+      } catch {}
     }, HOLD_MS);
   });
 
