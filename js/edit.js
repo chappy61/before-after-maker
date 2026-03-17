@@ -446,7 +446,11 @@ function installBadgeDrag(badge, pane, index) {
     startY = 0;
   let startX01 = 0,
     startY01 = 0;
+
   let dragging = false;
+  let armed = false;
+
+  const DRAG_THRESHOLD = 6;
 
   badge.style.touchAction = "none";
 
@@ -456,8 +460,10 @@ function installBadgeDrag(badge, pane, index) {
     e.preventDefault();
     e.stopPropagation();
 
-    dragging = true;
-    badgeDragging = true;
+    armed = true;
+    dragging = false;
+    badgeDragging = false;
+
     badge.setPointerCapture(e.pointerId);
 
     const p = normalize();
@@ -473,10 +479,22 @@ function installBadgeDrag(badge, pane, index) {
   });
 
   badge.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
+    if (!armed && !dragging) return;
     if (!badge.hasPointerCapture(e.pointerId)) return;
 
+    const dx0 = e.clientX - startX;
+    const dy0 = e.clientY - startY;
+    const moveDist = Math.hypot(dx0, dy0);
+
+    // 少し動いたらドラッグ開始
+    if (!dragging) {
+      if (moveDist < DRAG_THRESHOLD) return;
+      dragging = true;
+      badgeDragging = true;
+    }
+
     e.preventDefault();
+    e.stopPropagation();
 
     const p = normalize();
     p.labels = p.labels || {};
@@ -484,9 +502,6 @@ function installBadgeDrag(badge, pane, index) {
 
     const prect = pane.getBoundingClientRect();
     if (prect.width <= 1 || prect.height <= 1) return;
-
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
 
     const bw = badge.offsetWidth || 1;
     const bh = badge.offsetHeight || 1;
@@ -497,8 +512,8 @@ function installBadgeDrag(badge, pane, index) {
     const startLeftPx = startX01 * prect.width;
     const startTopPx = startY01 * prect.height;
 
-    let leftPx = startLeftPx + dx;
-    let topPx = startTopPx + dy;
+    let leftPx = startLeftPx + dx0;
+    let topPx = startTopPx + dy0;
 
     leftPx = clamp(leftPx, 0, maxLeftPx);
     topPx = clamp(topPx, 0, maxTopPx);
@@ -516,25 +531,29 @@ function installBadgeDrag(badge, pane, index) {
   });
 
   function endDrag(e) {
-    if (!dragging) return;
-    dragging = false;
-    badgeDragging = false;
+    armed = false;
 
     try {
-      if (badge.hasPointerCapture(e.pointerId))
+      if (badge.hasPointerCapture(e.pointerId)) {
         badge.releasePointerCapture(e.pointerId);
+      }
     } catch {}
 
-    // ✅ ドラッグ終わったタイミングで1回だけ保存
-    try {
-      saveProject(normalize());
-    } catch {}
-    console.log("badge endDrag", { badgeDragging, dragging });
+    if (dragging) {
+      dragging = false;
+      badgeDragging = false;
+      try {
+        saveProject(normalize());
+      } catch {}
+    } else {
+      badgeDragging = false;
+    }
   }
 
   badge.addEventListener("pointerup", endDrag);
   badge.addEventListener("pointercancel", endDrag);
   badge.addEventListener("lostpointercapture", () => {
+    armed = false;
     if (!dragging) return;
     dragging = false;
     badgeDragging = false;
@@ -744,11 +763,11 @@ async function render() {
 // ============================================================
 // Update one pane image
 // ============================================================
-function updateOne(i, p = null) {
-  const project = p || normalize();
+function updateOne(i, project = null) {
+  const p = project || normalize();
   const pane = split.querySelector(`.pane[data-index="${i}"]`);
   const img = pane?.querySelector("img, .pane-img");
-  if (img && project.edits[i]) applyTransform(img, project.edits[i]);
+  if (img && p.edits?.[i]) applyTransform(img, p.edits[i]);
 }
 
 // ============================================================
@@ -886,6 +905,14 @@ const captureOn = (el, pointerId) => {
   } catch {}
 };
 
+// ============================================================
+// Image drag/pinch (pointer events)
+// - mouse / touch / pen:
+//   1本指(1ポインタ) = 画像ドラッグ
+//   2本指(2ポインタ) = 移動 + 回転 + 拡大縮小
+// - badge(ラベル) は別処理で最優先
+// ============================================================
+
 const releaseOn = (el, pointerId) => {
   try {
     if (el.hasPointerCapture(pointerId)) el.releasePointerCapture(pointerId);
@@ -895,10 +922,11 @@ const releaseOn = (el, pointerId) => {
 split?.addEventListener(
   "pointerdown",
   (e) => {
-    if (e.target.closest?.(".badge")) return; // ラベルは別処理
+    // ラベル上は画像処理しない
+    if (e.target.closest?.(".badge")) return;
     if (badgeDragging) return;
 
-    // 1本目だけ：pane上じゃないなら編集開始しない
+    // 1本目だけ pane 必須
     if (pointers.size === 0) {
       const hitPane = e.target.closest?.(".pane");
       if (!hitPane) return;
@@ -907,13 +935,11 @@ split?.addEventListener(
       highlightActive();
       syncSlidersToActive();
     } else {
-      // 2本目以降：activeIndexが未確定なら無視（保険）
       if (activeIndex == null) return;
     }
 
-    // ed をここで確定
     const p = normalize();
-    const ed = p.edits[activeIndex];
+    const ed = p.edits?.[activeIndex];
     if (!ed) return;
 
     e.preventDefault();
@@ -921,27 +947,19 @@ split?.addEventListener(
 
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    // 本物スマホのタッチは 1本指では何もしない（2本指のみ）
-    const isRealTouch = e.pointerType === "touch";
-
-    // ✅ 1本目
+    // 1本目 → 常に drag 開始
     if (pointers.size === 1) {
-      // PC（mouse/pen）はドラッグOK、スマホ（touch）は無効
-      if (!isRealTouch) {
-        gesture = {
-          type: "drag",
-          startX: e.clientX,
-          startY: e.clientY,
-          baseX: ed.x || 0,
-          baseY: ed.y || 0,
-        };
-      } else {
-        gesture = null;
-      }
+      gesture = {
+        type: "drag",
+        startX: e.clientX,
+        startY: e.clientY,
+        baseX: ed.x || 0,
+        baseY: ed.y || 0,
+      };
       return;
     }
 
-    // ✅ 2本以上は pinch
+    // 2本目以降 → pinch へ昇格
     if (pointers.size >= 2) {
       const pts = [...pointers.values()];
       const a = pts[pts.length - 2];
@@ -966,21 +984,26 @@ split?.addEventListener(
   "pointermove",
   (e) => {
     if (!pointers.has(e.pointerId)) return;
+
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     const p = normalize();
-    const ed = p.edits[activeIndex];
+    const ed = p.edits?.[activeIndex];
     if (!ed) return;
 
-    if (gesture?.type === "drag") {
+    // ---- 1本指 drag ----
+    if (gesture?.type === "drag" && pointers.size === 1) {
       const dx = e.clientX - gesture.startX;
       const dy = e.clientY - gesture.startY;
+
       ed.x = Math.round((gesture.baseX || 0) + dx);
       ed.y = Math.round((gesture.baseY || 0) + dy);
+
       updateOne(activeIndex, p);
       return;
     }
 
+    // ---- 2本指以上 pinch ----
     if (pointers.size < 2) return;
 
     if (!gesture || gesture.type !== "pinch") {
@@ -1028,10 +1051,26 @@ split?.addEventListener(
 );
 
 function endPointer(e) {
-  if (!pointers.has(e.pointerId)) return;
-  pointers.delete(e.pointerId);
+  if (pointers.has(e.pointerId)) {
+    pointers.delete(e.pointerId);
+  }
 
-  if (pointers.size === 0) {
+  // 1本残ったら、その位置から drag 継続に切り替える
+  if (pointers.size === 1) {
+    const p = normalize();
+    const ed = p.edits?.[activeIndex];
+    const only = [...pointers.values()][0];
+
+    if (ed && only) {
+      gesture = {
+        type: "drag",
+        startX: only.x,
+        startY: only.y,
+        baseX: ed.x || 0,
+        baseY: ed.y || 0,
+      };
+    }
+  } else if (pointers.size === 0) {
     gesture = null;
     try {
       saveProject(normalize());
@@ -1044,7 +1083,6 @@ function endPointer(e) {
 split?.addEventListener("pointerup", endPointer);
 split?.addEventListener("pointercancel", endPointer);
 split?.addEventListener("lostpointercapture", (e) => endPointer(e));
-
 // ============================================================
 // Label color toggle (WHITE <-> BLACK) 2枚共通
 // ============================================================

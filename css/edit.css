@@ -78,6 +78,13 @@
   /* 視認性（保存画像と雰囲気合わせ） */
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
+
+.badge::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+
 .badge:active {
   cursor: grabbing;
 }
