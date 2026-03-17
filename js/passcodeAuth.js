@@ -1,10 +1,11 @@
 // js/passcodeAuth.js
 import { supabase } from "./supabaseClient.js";
-
+localStorage.removeItem("pc_fails");
+localStorage.removeItem("pc_lock_until");
 // ===== 設定（ここだけ変える）=====
-const PASSCODE = "1234";               // 4桁（サロン用）
-const EMAIL = "salon@app.local";       // Supabaseに作る共有ユーザー
-const PASSWORD = "IdvmkmkfyUUn6w";      // Supabaseに設定したPW
+const PASSCODE = "1234"; // 4桁（サロン用）
+const EMAIL = "salon@app.local"; // Supabaseに作る共有ユーザー
+const PASSWORD = "IdvmkmkfyUUn6w"; // Supabaseに設定したPW
 // ロック（総当たり対策）
 const MAX_TRIES = 3;
 const LOCK_MINUTES = 5;
@@ -27,7 +28,10 @@ function recordFail() {
   const fails = Number(localStorage.getItem(KEY_FAILS) || 0) + 1;
   localStorage.setItem(KEY_FAILS, String(fails));
   if (fails >= MAX_TRIES) {
-    localStorage.setItem(KEY_LOCK_UNTIL, String(now() + LOCK_MINUTES * 60 * 1000));
+    localStorage.setItem(
+      KEY_LOCK_UNTIL,
+      String(now() + LOCK_MINUTES * 60 * 1000),
+    );
     localStorage.setItem(KEY_FAILS, "0");
   }
   return fails;
@@ -59,7 +63,10 @@ export async function loginWithPasscode(code) {
 }
 
 export async function requireAuthOrRedirect(loginPath = "./k9x3.html") {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
   if (error) throw error;
   if (!session) {
     location.href = loginPath;
@@ -69,12 +76,14 @@ export async function requireAuthOrRedirect(loginPath = "./k9x3.html") {
 }
 
 export async function mustUser() {
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
   if (error) throw error;
   if (!user) throw new Error("Not signed in");
   return user;
 }
-
 
 export async function logout() {
   await supabase.auth.signOut();
