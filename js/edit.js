@@ -12,6 +12,7 @@ import { ensureProject, saveProject } from "./storage.js";
 import { composePNG } from "./compose.js";
 import { requireAuthOrRedirect } from "./passcodeAuth.js";
 import { resolveImageSrc } from "./storage.js";
+import { toPng } from "https://esm.sh/html-to-image";
 
 // ============================================================
 // DOM
